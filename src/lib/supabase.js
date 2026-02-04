@@ -1,22 +1,20 @@
-
 import { supabase } from '@/lib/customSupabaseClient';
 
 /**
  * Uploads a PDF file to Supabase Storage
- * @param {File} file 
- * @param {string} folder 
+ * @param {File} file
+ * @param {string} folder
  * @returns {Promise<string|null>} Public URL of the uploaded file
  */
 export const uploadPdfToStorage = async (file, folder = 'uploads') => {
   if (!file) return null;
-  
+
   const timestamp = Date.now();
-  // Sanitize filename to remove special characters
   const cleanFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
   const filePath = `${folder}/${timestamp}_${cleanFileName}`;
 
   try {
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from('pdfs')
       .upload(filePath, file, {
         cacheControl: '3600',
@@ -46,7 +44,7 @@ export const getPdfUrl = async (tableName, recordId) => {
       .select('pdf_url')
       .eq('id', recordId)
       .single();
-      
+
     if (error) throw error;
     return data?.pdf_url;
   } catch (error) {
@@ -56,9 +54,8 @@ export const getPdfUrl = async (tableName, recordId) => {
 };
 
 /**
- * Submits a free preview request by calling the 'create_preview' Edge Function.
- * uses supabase.functions.invoke as requested.
- * 
+ * Submits a free preview request by calling the 'rapid-worker' Edge Function.
+ *
  * @param {Object} data - { nome, email, whatsapp, edital_link, pdf_url }
  * @returns {Promise<{id: string, access_token: string, report_url?: string}>}
  */
@@ -70,18 +67,18 @@ export const submitFreePreview = async (data) => {
 
     if (!supabaseUrl || !supabaseKey) {
       console.error("❌ Missing Environment Variables in submitFreePreview");
-      throw new Error("Configuração Supabase incompleta. Verifique variáveis de ambiente no painel Hostinger.");
+      throw new Error("Configuração Supabase incompleta. Verifique as variáveis de ambiente no Vercel.");
     }
 
-    console.log("✅ Env vars checked. Invoking 'create_preview'...");
+    console.log("✅ Env vars checked. Invoking 'rapid-worker'...");
 
-    const { data: responseData, error } = await supabase.functions.invoke('create_preview', {
+    const { data: responseData, error } = await supabase.functions.invoke('rapid-worker', {
       body: {
         nome: data.nome,
         email: data.email,
         whatsapp: data.whatsapp,
         edital_link: data.edital_link,
-        url_pdf: data.pdf_url
+        pdf_url: data.pdf_url
       }
     });
 
@@ -91,8 +88,6 @@ export const submitFreePreview = async (data) => {
     }
 
     console.log("✅ Edge Function response received:", responseData);
-    
-    // Return the response data directly
     return responseData;
   } catch (error) {
     console.error('❌ Error inside submitFreePreview:', error);
@@ -104,8 +99,6 @@ export const submitFreePreview = async (data) => {
 
 /**
  * Submits a consultation request to Supabase
- * Syncs with table 'consultation_requests'
- * Columns: id, nome, email, whatsapp, caso_link_descricao, status, pdf_url, created_at, updated_at
  */
 export const submitConsultationRequest = async (data) => {
   try {
@@ -117,7 +110,7 @@ export const submitConsultationRequest = async (data) => {
           email: data.email,
           whatsapp: data.whatsapp,
           caso_link_descricao: data.caso_link_descricao,
-          pdf_url: data.pdf_url, 
+          pdf_url: data.pdf_url,
           status: 'pendente'
         }
       ]);
@@ -132,10 +125,6 @@ export const submitConsultationRequest = async (data) => {
 
 /**
  * Submits a paid analysis request to Supabase
- * Syncs with table 'paid_submissions'
- * Columns: id, nome, email, whatsapp, plano, plan_type, documentos, descricao, pdf_url, status...
- * @param {Object} data 
- * @returns {Promise<{success: boolean, id?: string, error?: any}>}
  */
 export const submitPaidSubmission = async (data) => {
   try {
@@ -147,7 +136,7 @@ export const submitPaidSubmission = async (data) => {
           email: data.email,
           whatsapp: data.whatsapp,
           plano: data.plano,
-          plan_type: data.plan_type, 
+          plan_type: data.plan_type,
           documentos: data.documentos,
           descricao: data.descricao,
           pdf_url: data.pdf_url,
@@ -167,15 +156,12 @@ export const submitPaidSubmission = async (data) => {
 
 /**
  * Updates a paid submission with Stripe session ID
- * @param {string} submissionId 
- * @param {string} sessionId 
- * @returns {Promise<{success: boolean, error?: any}>}
  */
 export const updateSubmissionStripeSession = async (submissionId, sessionId) => {
   try {
     const { error } = await supabase
       .from('paid_submissions')
-      .update({ 
+      .update({
         stripe_session_id: sessionId,
         status: 'processando'
       })
@@ -190,3 +176,4 @@ export const updateSubmissionStripeSession = async (submissionId, sessionId) => 
 };
 
 export default supabase;
+
