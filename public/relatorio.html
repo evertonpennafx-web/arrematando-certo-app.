@@ -1,0 +1,432 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Relatório de Análise | Arrematando Certo</title>
+    <!-- Preconnect to fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #d4af37;
+            --primary-dark: #b8941f;
+            --bg-dark: #0a0a0a;
+            --surface: #ffffff;
+            --text-main: #1f2937;
+            --text-secondary: #6b7280;
+            --error: #ef4444;
+            --success: #10b981;
+            --border: #e5e7eb;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+            margin: 0;
+            padding: 20px;
+            color: var(--text-main);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .main-container {
+            width: 100%;
+            max-width: 900px;
+            background: var(--surface);
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.08);
+            margin-top: 40px;
+            margin-bottom: 40px;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .header-bar {
+            background: var(--bg-dark);
+            padding: 24px 32px;
+            border-bottom: 3px solid var(--primary);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .header-title {
+            color: white;
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-logo {
+            color: var(--primary);
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-badge.processando {
+            background: rgba(212, 175, 55, 0.2);
+            color: var(--primary);
+            border: 1px solid var(--primary);
+        }
+
+        .status-badge.finalizado {
+            background: rgba(16, 185, 129, 0.15);
+            color: var(--success);
+            border: 1px solid var(--success);
+        }
+
+        .status-badge.erro {
+            background: rgba(239, 68, 68, 0.15);
+            color: var(--error);
+            border: 1px solid var(--error);
+        }
+
+        .content-area {
+            padding: 40px;
+            min-height: 300px;
+        }
+
+        /* Loading State */
+        .loading-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 60px 20px;
+            text-align: center;
+        }
+
+        .loader-ring {
+            display: inline-block;
+            position: relative;
+            width: 64px;
+            height: 64px;
+            margin-bottom: 24px;
+        }
+
+        .loader-ring div {
+            box-sizing: border-box;
+            display: block;
+            position: absolute;
+            width: 51px;
+            height: 51px;
+            margin: 6px;
+            border: 3px solid var(--primary);
+            border-radius: 50%;
+            animation: loader-ring 1.2s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+            border-color: var(--primary) transparent transparent transparent;
+        }
+
+        .loader-ring div:nth-child(1) { animation-delay: -0.45s; }
+        .loader-ring div:nth-child(2) { animation-delay: -0.3s; }
+        .loader-ring div:nth-child(3) { animation-delay: -0.15s; }
+
+        @keyframes loader-ring {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 18px;
+            font-weight: 500;
+            color: var(--text-main);
+            margin-bottom: 8px;
+        }
+
+        .loading-subtext {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        /* Report Content Styles */
+        .report-html {
+            font-size: 16px;
+            color: #374151;
+        }
+
+        .report-html h1, .report-html h2, .report-html h3 {
+            color: #111827;
+            font-weight: 700;
+            margin-top: 2em;
+            margin-bottom: 1em;
+        }
+
+        .report-html h1 { font-size: 24px; border-bottom: 2px solid var(--primary); padding-bottom: 10px; }
+        .report-html h2 { font-size: 20px; color: var(--primary-dark); }
+        .report-html ul, .report-html ol { padding-left: 24px; margin-bottom: 1.5em; }
+        .report-html li { margin-bottom: 0.5em; }
+        .report-html p { margin-bottom: 1.5em; }
+        .report-html strong { color: #000; font-weight: 600; }
+        
+        .error-container {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .error-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+            display: block;
+        }
+
+        .error-title {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--error);
+            margin-bottom: 12px;
+        }
+
+        /* Setup Panel (Only for dev/setup purposes if vars missing) */
+        #setup-panel {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 9999;
+            display: none; /* Hidden by default */
+            align-items: center;
+            justify-content: center;
+        }
+
+        .setup-card {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .footer {
+            margin-top: auto;
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-secondary);
+            padding: 20px;
+        }
+
+        @media (max-width: 640px) {
+            .main-container { margin-top: 0; border-radius: 0; min-height: 100vh; margin-bottom: 0; }
+            .header-bar { padding: 16px 20px; }
+            .content-area { padding: 24px 20px; }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="main-container">
+        <header class="header-bar">
+            <h1 class="header-title">
+                <span class="header-logo">Arrematando Certo</span>
+                <span style="opacity: 0.3; font-weight: 300;">|</span>
+                <span>Relatório</span>
+            </h1>
+            <div id="status-badge" class="status-badge processando" style="display: none;">Verificando...</div>
+        </header>
+
+        <div id="content-area" class="content-area">
+            <!-- Loading State -->
+            <div id="loader" class="loading-container">
+                <div class="loader-ring"><div></div><div></div><div></div><div></div></div>
+                <div class="loading-text">Carregando relatório...</div>
+                <div class="loading-subtext">Verificando suas credenciais de acesso</div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        &copy; 2024 Arrematando Certo. Todos os direitos reservados.
+    </footer>
+
+    <!-- Setup Panel for Env vars (Just in case, though edge function handles logic) -->
+    <div id="setup-panel">
+        <div class="setup-card">
+            <h3>Configuração</h3>
+            <p>Insira as credenciais públicas do Supabase</p>
+            <input type="text" id="sb-url-input" placeholder="URL" style="width: 100%; margin-bottom: 10px; padding: 8px;">
+            <input type="text" id="sb-key-input" placeholder="Anon Key" style="width: 100%; margin-bottom: 10px; padding: 8px;">
+            <button onclick="saveConfig()" style="width: 100%; padding: 10px; background: #000; color: #fff; border: none; cursor: pointer;">Salvar</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+        // CONFIGURATION: Set these before deployment or use the setup panel mechanism
+        // For static file, ideally these come from build process or user input if strict.
+        // Since this is a static HTML file served from public/, we need valid credentials.
+        // We will attempt to use localStorage or prompt if missing, but for a "viewer" 
+        // usually the public anon key is hardcoded in the frontend code.
+        // Here we use placeholders that the user must replace or we check localStorage.
+        
+        let SUPABASE_URL = localStorage.getItem('sb_url') || 'YOUR_SUPABASE_URL_HERE';
+        let SUPABASE_ANON_KEY = localStorage.getItem('sb_key') || 'YOUR_SUPABASE_ANON_KEY_HERE';
+
+        // DOM Elements
+        const contentArea = document.getElementById('content-area');
+        const statusBadge = document.getElementById('status-badge');
+        const loader = document.getElementById('loader');
+
+        // Helper: Parse Query Params
+        const getQueryParams = () => {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                id: params.get('id'),
+                token: params.get('t')
+            };
+        };
+
+        // Helper: Display Error
+        const showError = (title, message) => {
+            statusBadge.style.display = 'block';
+            statusBadge.className = 'status-badge erro';
+            statusBadge.innerText = 'Erro';
+            
+            contentArea.innerHTML = `
+                <div class="error-container">
+                    <span class="error-icon">⚠️</span>
+                    <div class="error-title">${title}</div>
+                    <p>${message}</p>
+                    <a href="/" style="display: inline-block; margin-top: 20px; color: var(--primary); text-decoration: none; font-weight: 600;">Voltar para Home</a>
+                </div>
+            `;
+        };
+
+        // Helper: Update Loading Message
+        const updateLoader = (text) => {
+            const textEl = document.querySelector('.loading-text');
+            if(textEl) textEl.innerText = text;
+        };
+
+        // Main Logic
+        const init = async () => {
+            const { id, token } = getQueryParams();
+
+            // 1. Basic Validation
+            if (!id || !token) {
+                showError('Link Inválido', 'O link utilizado está incompleto ou incorreto. Verifique se você copiou o endereço completo enviado por e-mail.');
+                return;
+            }
+
+            // Check if credentials are set (simple check against placeholders)
+            if (SUPABASE_URL.includes('YOUR_SUPABASE') || SUPABASE_ANON_KEY.includes('YOUR_SUPABASE')) {
+                // If this runs in the provided environment, the user might need to input them.
+                // However, in a real deployed scenario, these would be populated.
+                // For this task, we'll try to detect if we are in the "connected" state via UI or just show Setup.
+                document.getElementById('setup-panel').style.display = 'flex';
+                return; 
+            }
+
+            const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+            // Polling function
+            const pollReport = async () => {
+                try {
+                    updateLoader('Buscando análise...');
+                    
+                    // Call Edge Function
+                    const { data, error } = await supabase.functions.invoke('get_report', {
+                        body: { id, token }
+                    });
+
+                    if (error) {
+                        // Edge function invocation error (network, or 500)
+                        console.error("Invoke Error:", error);
+                        throw new Error('Falha ao conectar com o servidor.');
+                    }
+
+                    // Handle application errors returned by function
+                    if (data && data.error) {
+                         if (data.error === 'Token expired' || data.error === 'Invalid token') {
+                             showError('Acesso Negado', 'Este link expirou ou é inválido por motivos de segurança.');
+                             return;
+                         }
+                         if (data.error === 'Report not found') {
+                             showError('Relatório não encontrado', 'Não encontramos uma análise para este identificador.');
+                             return;
+                         }
+                         throw new Error(data.error);
+                    }
+
+                    // Handle Status
+                    if (data.status === 'processando' || data.status === 'pendente') {
+                        statusBadge.style.display = 'block';
+                        statusBadge.className = 'status-badge processando';
+                        statusBadge.innerText = 'Em Processamento';
+                        updateLoader('Analisando seu edital...');
+                        
+                        // Retry after 3 seconds
+                        setTimeout(pollReport, 3000);
+                        return;
+                    }
+
+                    if (data.status === 'erro') {
+                        showError('Falha na Análise', data.error_message || 'Ocorreu um erro técnico durante a análise do seu documento. Nossa equipe foi notificada.');
+                        return;
+                    }
+
+                    if (data.status === 'finalizado' && data.report_html) {
+                        statusBadge.style.display = 'block';
+                        statusBadge.className = 'status-badge finalizado';
+                        statusBadge.innerText = 'Finalizado';
+                        
+                        // Render Content
+                        contentArea.innerHTML = `
+                            <div class="report-html fade-in">
+                                ${data.report_html}
+                            </div>
+                        `;
+                        return;
+                    }
+
+                    // Fallback
+                    showError('Status Desconhecido', 'O status do relatório não pôde ser identificado.');
+
+                } catch (err) {
+                    console.error("Polling Error:", err);
+                    showError('Erro de Conexão', 'Não foi possível carregar o relatório. Tente atualizar a página.');
+                }
+            };
+
+            // Start Polling
+            pollReport();
+        };
+
+        // Setup Panel Logic (Global scope for onclick)
+        window.saveConfig = () => {
+            const url = document.getElementById('sb-url-input').value;
+            const key = document.getElementById('sb-key-input').value;
+            if(url && key) {
+                localStorage.setItem('sb_url', url);
+                localStorage.setItem('sb_key', key);
+                SUPABASE_URL = url;
+                SUPABASE_ANON_KEY = key;
+                document.getElementById('setup-panel').style.display = 'none';
+                init(); // Restart init
+            }
+        };
+
+        // Start
+        init();
+    </script>
+</body>
+</html>
