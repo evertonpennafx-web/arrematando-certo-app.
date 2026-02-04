@@ -1,3 +1,69 @@
+import { supabase } from '@/lib/customSupabaseClient';
+
+/**
+ * Uploads a PDF file to Supabase Storage
+ * @param {File} file
+ * @param {string} folder
+ * @returns {Promise<string|null>} Public URL of the uploaded file
+ */
+export const uploadPdfToStorage = async (file, folder = 'uploads') => {
+  if (!file) return null;
+
+  const timestamp = Date.now();
+  // Sanitize filename to remove special characters
+  const cleanFileName = file.name.replace(/[^a-zA-Z0-9.]/g, '_');
+  const filePath = `${folder}/${timestamp}_${cleanFileName}`;
+
+  try {
+    const { error } = await supabase.storage
+      .from('pdfs')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (error) throw error;
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('pdfs')
+      .getPublicUrl(filePath);
+
+    return publicUrl;
+  } catch (error) {
+    console.error('Error uploading PDF:', error);
+    throw error;
+  }
+};
+
+// ✅ Alias (se alguma página importar com outro nome por engano)
+// Não quebra nada e evita “is not exported” em builds.
+export const uploadPdfToStorageAlias = uploadPdfToStorage;
+
+/**
+ * Helper to retrieve PDF URL (if needed for later fetching)
+ */
+export const getPdfUrl = async (tableName, recordId) => {
+  try {
+    const { data, error } = await supabase
+      .from(tableName)
+      .select('pdf_url')
+      .eq('id', recordId)
+      .single();
+
+    if (error) throw error;
+    return data?.pdf_url;
+  } catch (error) {
+    console.error('Error fetching PDF URL:', error);
+    return null;
+  }
+};
+
+/**
+ * Submits a free preview request by calling the 'rapid-worker' Edge Function.
+ *
+ * @param {Object} data - { nome, email, whatsapp, edital_link, pdf_url }
+ * @returns {Promise<{id: string, access_token: string, report_url?: string}>}
+ */
 export const submitFreePreview = async (data) => {
   console.group("=== SUBMIT FREE PREVIEW START ===");
   try {
@@ -18,10 +84,10 @@ export const submitFreePreview = async (data) => {
         whatsapp: data.whatsapp,
         edital_link: data.edital_link,
 
-        // ✅ Edge Function exige 'url_pdf'
+        // ✅ a Edge Function exige este nome:
         url_pdf: data.pdf_url,
 
-        // (opcional) compatibilidade: não atrapalha se a função ignorar
+        // ✅ opcional: compatibilidade, caso sua função também aceite este:
         pdf_url: data.pdf_url
       }
     });
@@ -40,3 +106,85 @@ export const submitFreePreview = async (data) => {
     console.groupEnd();
   }
 };
+
+/**
+ * Submits a consultation request to Supabase
+ * Syncs with table 'consultation_requests'
+ */
+export const submitConsultationRequest = async (data) => {
+  try {
+    const { error } = await supabase
+      .from('consultation_requests')
+      .insert([
+        {
+          nome: data.nome,
+          email: data.email,
+          whatsapp: data.whatsapp,
+          caso_link_descricao: data.caso_link_descricao,
+          pdf_url: data.pdf_url,
+          status: 'pendente'
+        }
+      ]);
+
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('Error submitting consultation request:', error);
+    throw error;
+  }
+};
+
+/**
+ * Submits a paid analysis request to Supabase
+ * Syncs with table 'paid_submissions'
+ */
+export const submitPaidSubmission = async (data) => {
+  try {
+    const { data: result, error } = await supabase
+      .from('paid_submissions')
+      .insert([
+        {
+          nome: data.nome,
+          email: data.email,
+          whatsapp: data.whatsapp,
+          plano: data.plano,
+          plan_type: data.plan_type,
+          documentos: data.documentos,
+          descricao: data.descricao,
+          pdf_url: data.pdf_url,
+          status: 'pendente'
+        }
+      ])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return { success: true, id: result.id };
+  } catch (error) {
+    console.error('Error submitting paid request:', error);
+    throw error;
+  }
+};
+
+/**
+ * Updates a paid submission with Stripe session ID
+ */
+export const updateSubmissionStripeSession = async (submissionId, sessionId) => {
+  try {
+    const { error } = await supabase
+      .from('paid_submissions')
+      .update({
+        stripe_session_id: sessionId,
+        status: 'processando'
+      })
+      .eq('id', submissionId);
+
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating stripe session:', error);
+    throw error;
+  }
+};
+
+export default supabase;
