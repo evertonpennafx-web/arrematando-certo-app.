@@ -4,16 +4,17 @@ const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('supabaseUrl and supabaseAnonKey are required');
+  throw new Error('supabaseUrl is required.');
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 /**
- * Upload do PDF para o Storage
+ * Upload genérico de PDF para o Storage
  */
-export async function uploadPdfToStorage(file) {
-  const fileName = `${Date.now()}-${file.name}`;
+export async function uploadPdfToStorage(file, pathPrefix = 'uploads') {
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${pathPrefix}/${Date.now()}.${fileExt}`;
 
   const { error } = await supabase.storage
     .from('pdfs')
@@ -29,31 +30,34 @@ export async function uploadPdfToStorage(file) {
 }
 
 /**
- * Envio de preview gratuito
+ * Preview gratuito
  */
 export async function submitFreePreview(payload) {
-  const { data, error } = await supabase.functions.invoke(
-    'submit_free_preview',
-    {
-      body: payload,
-    }
-  );
+  const { error } = await supabase
+    .from('preview_gratuito')
+    .insert(payload);
 
   if (error) throw error;
-  return data;
 }
 
 /**
- * Envio de submissão paga
+ * Envio pago
  */
 export async function submitPaidSubmission(payload) {
-  const { data, error } = await supabase.functions.invoke(
-    'submit_paid_submission',
-    {
-      body: payload,
-    }
-  );
+  const { error } = await supabase
+    .from('submissions')
+    .insert(payload);
 
   if (error) throw error;
-  return data;
+}
+
+/**
+ * Solicitação de consultoria
+ */
+export async function submitConsultationRequest(payload) {
+  const { error } = await supabase
+    .from('consultation_requests')
+    .insert(payload);
+
+  if (error) throw error;
 }
