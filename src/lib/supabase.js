@@ -1,56 +1,59 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Cliente principal (só no browser)
-let supabase = null;
-
-if (
-  typeof window !== "undefined" &&
-  supabaseUrl &&
-  supabaseAnonKey
-) {
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('supabaseUrl and supabaseAnonKey are required');
 }
 
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
 /**
- * Upload de PDF para o Storage
+ * Upload do PDF para o Storage
  */
-async function uploadPdfToStorage(file, path) {
-  if (!supabase) throw new Error("Supabase not initialized");
+export async function uploadPdfToStorage(file) {
+  const fileName = `${Date.now()}-${file.name}`;
 
   const { error } = await supabase.storage
-    .from("pdfs")
-    .upload(path, file, {
-      upsert: true,
-      contentType: "application/pdf",
-    });
+    .from('pdfs')
+    .upload(fileName, file, { upsert: false });
 
   if (error) throw error;
 
-  const { data } = supabase.storage.from("pdfs").getPublicUrl(path);
+  const { data } = supabase.storage
+    .from('pdfs')
+    .getPublicUrl(fileName);
+
   return data.publicUrl;
 }
 
 /**
- * Submissão paga (mantido para não quebrar build)
+ * Envio de preview gratuito
  */
-async function submitPaidSubmission(payload) {
-  if (!supabase) throw new Error("Supabase not initialized");
-
-  const { data, error } = await supabase
-    .from("paid_submissions")
-    .insert(payload)
-    .select()
-    .single();
+export async function submitFreePreview(payload) {
+  const { data, error } = await supabase.functions.invoke(
+    'submit_free_preview',
+    {
+      body: payload,
+    }
+  );
 
   if (error) throw error;
   return data;
 }
 
-export {
-  supabase,
-  uploadPdfToStorage,
-  submitPaidSubmission,
-};
+/**
+ * Envio de submissão paga
+ */
+export async function submitPaidSubmission(payload) {
+  const { data, error } = await supabase.functions.invoke(
+    'submit_paid_submission',
+    {
+      body: payload,
+    }
+  );
+
+  if (error) throw error;
+  return data;
+}
