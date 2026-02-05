@@ -7,10 +7,10 @@ import Resultado from "./pages/Resultado";
 export default function AppRoutes() {
   return (
     <Routes>
-      {/* HOME BONITA (com planos, depoimentos etc.) */}
+      {/* HOME PRINCIPAL (BONITA) */}
       <Route path="/" element={<HomePage />} />
 
-      {/* MVP IA */}
+      {/* MVP */}
       <Route path="/analisar" element={<Analisar />} />
       <Route path="/resultado" element={<Resultado />} />
 
