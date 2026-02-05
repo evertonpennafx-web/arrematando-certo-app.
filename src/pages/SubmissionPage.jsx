@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 
-const WHATSAPP_NUMBER = "55SEUNUMEROAQUI"; // ex: 5511999999999 (sem +, sem espaços)
+const WHATSAPP_NUMBER = "5511932087649";
 
 export default function SubmissionPage() {
   const [searchParams] = useSearchParams();
