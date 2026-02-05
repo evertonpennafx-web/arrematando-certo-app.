@@ -1,10 +1,17 @@
 import { Routes, Route } from "react-router-dom";
-import WelcomeMessage from "./components/WelcomeMessage";
+
+function Home() {
+  return (
+    <div style={{ padding: 24, color: "#fff" }}>
+      HOME ARREMATANDO CERTO ✅
+    </div>
+  );
+}
 
 export default function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<WelcomeMessage />} />
+      <Route path="/" element={<Home />} />
     </Routes>
   );
 }
