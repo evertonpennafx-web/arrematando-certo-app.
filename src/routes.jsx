@@ -1,15 +1,21 @@
 import { Routes, Route } from "react-router-dom";
-import Home from "./pages/Home";
+
+import HomePage from "./pages/HomePage";
 import Analisar from "./pages/Analisar";
 import Resultado from "./pages/Resultado";
 
 export default function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Home />} />
+      {/* HOME BONITA (com planos, depoimentos etc.) */}
+      <Route path="/" element={<HomePage />} />
+
+      {/* MVP IA */}
       <Route path="/analisar" element={<Analisar />} />
       <Route path="/resultado" element={<Resultado />} />
-      <Route path="*" element={<Home />} />
+
+      {/* fallback */}
+      <Route path="*" element={<HomePage />} />
     </Routes>
   );
 }
