@@ -1,11 +1,16 @@
-import { useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useMemo, useRef, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 
-const WHATSAPP_NUMBER = "5511932087649"; // seu WhatsApp (Brasil)
+const WHATSAPP_NUMBER = "5511932087649";
 
 export default function SubmissionPage() {
-  const [searchParams] = useSearchParams();
-  const plan = (searchParams.get("plan") || "standard").toLowerCase();
+  const location = useLocation();
+  const [loading, setLoading] = useState(false);
+
+  const plan = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return (params.get("plan") || "standard").toLowerCase();
+  }, [location.search]);
 
   const planInfo = useMemo(() => {
     const plans = {
@@ -23,19 +28,19 @@ export default function SubmissionPage() {
     return plans[plan] || plans.standard;
   }, [plan]);
 
-  const [nome, setNome] = useState("");
-  const [whatsapp, setWhatsapp] = useState("");
-  const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
+  // ✅ Inputs UNCONTROLLED (não perdem foco por re-render)
+  const nomeRef = useRef(null);
+  const whatsappRef = useRef(null);
+  const emailRef = useRef(null);
 
   function handleSubmit(e) {
     e.preventDefault();
 
-    const n = nome.trim();
-    const w = whatsapp.trim();
-    const em = email.trim();
+    const nome = (nomeRef.current?.value || "").trim();
+    const whatsapp = (whatsappRef.current?.value || "").trim();
+    const email = (emailRef.current?.value || "").trim();
 
-    if (!n || !w) {
+    if (!nome || !whatsapp) {
       alert("Preencha pelo menos Nome e WhatsApp.");
       return;
     }
@@ -43,18 +48,16 @@ export default function SubmissionPage() {
     setLoading(true);
 
     const lead = {
-      nome: n,
-      whatsapp: w,
-      email: em,
+      nome,
+      whatsapp,
+      email,
       plan,
       createdAt: new Date().toISOString(),
     };
 
     try {
       localStorage.setItem("ac_lead", JSON.stringify(lead));
-    } catch (_) {
-      // se o navegador bloquear localStorage, segue o fluxo mesmo assim
-    }
+    } catch (_) {}
 
     const text = encodeURIComponent(
       `Olá! Quero assinar o ${planInfo.title} (${planInfo.price}).\n\n` +
@@ -65,8 +68,6 @@ export default function SubmissionPage() {
     );
 
     const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${text}`;
-
-    // abre no mesmo tab (mais confiável em mobile/desktop)
     window.location.assign(url);
   }
 
@@ -77,16 +78,14 @@ export default function SubmissionPage() {
 
         <h1 style={h1Style}>{planInfo.title}</h1>
         <p style={subStyle}>
-          {planInfo.price} • Plano selecionado: <b>{plan}</b>
+          {planInfo.price} • Plano: <b>{plan}</b>
         </p>
 
         <div style={gridStyle}>
           <div style={cardStyle}>
             <h3 style={h3Style}>O que você recebe</h3>
             <ul style={ulStyle}>
-              {planInfo.bullets.map((b) => (
-                <li key={b}>{b}</li>
-              ))}
+              {planInfo.bullets.map((b) => <li key={b}>{b}</li>)}
             </ul>
           </div>
 
@@ -95,27 +94,24 @@ export default function SubmissionPage() {
 
             <div style={{ display: "grid", gap: 10 }}>
               <input
+                ref={nomeRef}
                 name="nome"
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
                 autoComplete="name"
                 placeholder="Seu nome completo"
                 style={inputStyle}
               />
 
               <input
+                ref={whatsappRef}
                 name="whatsapp"
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
                 autoComplete="tel"
                 placeholder="WhatsApp (DDD + número)"
                 style={inputStyle}
               />
 
               <input
+                ref={emailRef}
                 name="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
                 autoComplete="email"
                 placeholder="E-mail (opcional)"
                 style={inputStyle}
@@ -126,7 +122,7 @@ export default function SubmissionPage() {
               </button>
 
               <p style={hintStyle}>
-                MVP: por enquanto a assinatura é validada pelo WhatsApp. Depois podemos plugar Stripe.
+                MVP: validação por WhatsApp. Depois pluga pagamento.
               </p>
             </div>
           </form>
@@ -137,56 +133,15 @@ export default function SubmissionPage() {
 }
 
 /* styles */
-const pageStyle = {
-  minHeight: "100vh",
-  background: "#0b0b0b",
-  color: "#fff",
-  padding: 24,
-};
-
-const containerStyle = {
-  maxWidth: 900,
-  margin: "0 auto",
-};
-
-const backStyle = {
-  color: "#bbb",
-  textDecoration: "none",
-};
-
-const h1Style = {
-  margin: "12px 0 6px 0",
-};
-
-const subStyle = {
-  opacity: 0.85,
-  marginTop: 0,
-};
-
-const gridStyle = {
-  display: "grid",
-  gridTemplateColumns: "1fr",
-  gap: 16,
-  marginTop: 16,
-};
-
-const cardStyle = {
-  border: "1px solid #222",
-  borderRadius: 14,
-  padding: 16,
-  background: "#111",
-};
-
-const h3Style = {
-  marginTop: 0,
-};
-
-const ulStyle = {
-  lineHeight: 1.8,
-  margin: 0,
-  paddingLeft: 18,
-};
-
+const pageStyle = { minHeight: "100vh", background: "#0b0b0b", color: "#fff", padding: 24 };
+const containerStyle = { maxWidth: 900, margin: "0 auto" };
+const backStyle = { color: "#bbb", textDecoration: "none" };
+const h1Style = { margin: "12px 0 6px 0" };
+const subStyle = { opacity: 0.85, marginTop: 0 };
+const gridStyle = { display: "grid", gridTemplateColumns: "1fr", gap: 16, marginTop: 16 };
+const cardStyle = { border: "1px solid #222", borderRadius: 14, padding: 16, background: "#111" };
+const h3Style = { marginTop: 0 };
+const ulStyle = { lineHeight: 1.8, margin: 0, paddingLeft: 18 };
 const inputStyle = {
   padding: "12px 12px",
   borderRadius: 12,
@@ -195,7 +150,6 @@ const inputStyle = {
   color: "#fff",
   outline: "none",
 };
-
 const buttonStyle = (loading) => ({
   padding: "12px 14px",
   borderRadius: 12,
@@ -205,9 +159,4 @@ const buttonStyle = (loading) => ({
   background: "#22c55e",
   color: "#000",
 });
-
-const hintStyle = {
-  margin: 0,
-  opacity: 0.7,
-  fontSize: 13,
-};
+const hintStyle = { margin: 0, opacity: 0.7, fontSize: 13 };
