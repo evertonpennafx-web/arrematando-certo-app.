@@ -18,7 +18,7 @@ function assertSupabase() {
 }
 
 /**
- * Normaliza opts:
+ * Normaliza opts para upload:
  * - Se vier string => interpreta como { bucket: string }
  * - Se vier objeto => usa normalmente
  */
@@ -27,6 +27,19 @@ function normalizeUploadOpts(opts) {
   if (typeof opts === "string") return { bucket: opts };
   if (typeof opts === "object") return opts;
   return {};
+}
+
+/**
+ * Gera access_token simples (MVP).
+ */
+function generateAccessToken() {
+  try {
+    // browsers modernos
+    return crypto.randomUUID();
+  } catch {
+    // fallback
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
 }
 
 /**
@@ -54,10 +67,7 @@ export async function uploadPdfToStorage(file, opts = {}) {
     contentType: file?.type || "application/pdf",
   });
 
-  if (upErr) {
-    // Mantém o erro “cru” do Supabase (é ele que traz "Bucket not found")
-    throw upErr;
-  }
+  if (upErr) throw upErr;
 
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   const publicUrl = data?.publicUrl || null;
@@ -66,35 +76,22 @@ export async function uploadPdfToStorage(file, opts = {}) {
 }
 
 /**
- * Gera um token simples para acesso (client-side), mantendo seu padrão
- * de retorno (id, access_token, report_url).
- */
-function generateAccessToken() {
-  try {
-    // Browsers modernos
-    return crypto.randomUUID();
-  } catch {
-    // fallback
-    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  }
-}
-
-/**
- * Salva degustação gratuita (free_previews)
- * Retorna no padrão esperado pelo seu frontend:
- * { id, access_token, report_url }
+ * Degustação gratuita (tabela: preview_gratuito)
+ * Retorna no padrão esperado pelo frontend:
+ * { id, access_token, report_url? }
  */
 export async function submitFreePreview(payload = {}) {
   assertSupabase();
 
+  // Seu formulário manda: nome, email, whatsapp, edital_link, pdf_url
+  // Vamos garantir um token e salvar.
   const access_token = payload.access_token || generateAccessToken();
-
-  // garantimos que o token vá pro banco também (pra bater com /relatorio?id=...&t=...)
   const rowToInsert = { ...payload, access_token };
 
-  // IMPORTANT: para receber id de volta, precisa select()
+  // IMPORTANTE:
+  // Para receber "id" de volta, usamos select() + single()
   const { data, error } = await supabase
-    .from("free_previews")
+    .from("preview_gratuito")
     .insert([rowToInsert])
     .select("id, access_token, report_url")
     .single();
@@ -108,6 +105,10 @@ export async function submitFreePreview(payload = {}) {
   };
 }
 
+/**
+ * Envio pago (tabela: paid_submissions)
+ * Retorna { ok, id }
+ */
 export async function submitPaidSubmission(payload = {}) {
   assertSupabase();
 
@@ -118,9 +119,14 @@ export async function submitPaidSubmission(payload = {}) {
     .single();
 
   if (error) throw error;
+
   return { ok: true, id: data?.id };
 }
 
+/**
+ * Consultoria (tabela: consultation_requests)
+ * Retorna { ok, id }
+ */
 export async function submitConsultationRequest(payload = {}) {
   assertSupabase();
 
@@ -131,5 +137,6 @@ export async function submitConsultationRequest(payload = {}) {
     .single();
 
   if (error) throw error;
+
   return { ok: true, id: data?.id };
 }
