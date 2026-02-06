@@ -1,6 +1,4 @@
 // /api/create_preview.js
-import { createClient } from "@supabase/supabase-js";
-
 function sendJson(res, status, payload) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -12,7 +10,6 @@ function normUrl(u) {
 }
 
 export default async function handler(req, res) {
-  // CORS (ok manter)
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -27,31 +24,12 @@ export default async function handler(req, res) {
   }
 
   try {
-    // ✅ Fonte de verdade: VITE_SUPABASE_URL (porque é o mesmo projeto do front)
-    const viteUrl = normUrl(process.env.VITE_SUPABASE_URL);
-    const serverUrl = normUrl(process.env.SUPABASE_URL);
-
-    const SUPABASE_URL = viteUrl || serverUrl;
-
-    const SERVICE_ROLE =
-      String(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
+    const SUPABASE_URL = normUrl(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL);
+    const SERVICE_ROLE = String(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
 
     if (!SUPABASE_URL) {
-      return sendJson(res, 500, { ok: false, error: "Missing env: VITE_SUPABASE_URL or SUPABASE_URL" });
+      return sendJson(res, 500, { ok: false, error: "Missing env: SUPABASE_URL (or VITE_SUPABASE_URL)" });
     }
-
-    if (viteUrl && serverUrl && viteUrl !== serverUrl) {
-      // ✅ Isso é exatamente o tipo de bug que faz “function not found do nada”
-      return sendJson(res, 500, {
-        ok: false,
-        error: "Env mismatch: SUPABASE_URL diferente de VITE_SUPABASE_URL (apontando para projetos diferentes).",
-        details: {
-          VITE_SUPABASE_URL: viteUrl,
-          SUPABASE_URL: serverUrl,
-        },
-      });
-    }
-
     if (!SERVICE_ROLE) {
       return sendJson(res, 500, { ok: false, error: "Missing env: SUPABASE_SERVICE_ROLE_KEY" });
     }
@@ -66,10 +44,8 @@ export default async function handler(req, res) {
       }
     }
 
-    // ✅ Aceita nomes antigos e novos
     const url_pdf = String(body?.url_pdf || body?.pdf_url || "").trim();
     const edital_link = String(body?.edital_link || body?.leilao_url || "").trim();
-
     const nome = String(body?.nome || "").trim();
     const whatsapp = String(body?.whatsapp || "").trim();
     const email = String(body?.email || "").trim();
@@ -89,7 +65,6 @@ export default async function handler(req, res) {
 
     const functionUrl = `${SUPABASE_URL}/functions/v1/create_preview`;
 
-    // Chama Edge Function (server-to-server)
     const fnResp = await fetch(functionUrl, {
       method: "POST",
       headers: {
@@ -98,7 +73,6 @@ export default async function handler(req, res) {
         authorization: `Bearer ${SERVICE_ROLE}`,
       },
       body: JSON.stringify({
-        // manda os dois formatos, pra compatibilidade total
         url_pdf,
         edital_link,
         pdf_url: url_pdf,
@@ -122,20 +96,12 @@ export default async function handler(req, res) {
         ok: false,
         error: data?.error || "Falha ao criar prévia (create_preview).",
         details: data?.details || data || txt || null,
-        debug: {
-          status: fnResp.status,
-          functionUrl,
-          usedSupabaseUrl: SUPABASE_URL,
-        },
+        debug: { status: fnResp.status, functionUrl },
       });
     }
 
     return sendJson(res, 200, data);
   } catch (err) {
-    return sendJson(res, 500, {
-      ok: false,
-      error: "Unhandled error",
-      details: String(err?.message || err),
-    });
+    return sendJson(res, 500, { ok: false, error: "Unhandled error", details: String(err?.message || err) });
   }
 }
