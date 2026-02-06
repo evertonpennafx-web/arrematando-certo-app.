@@ -21,23 +21,24 @@ export default function FreeTastingPage() {
     return s.includes(".pdf");
   }
 
-  // ✅ VOLTA AO FLUXO ANTIGO: Supabase Edge Function direto (sem /api)
   async function callCreatePreview(payload) {
     const { data, error } = await supabase.functions.invoke("create_preview", {
       body: payload,
     });
 
     if (error) {
-      // supabase-js error geralmente tem message/context
+      console.error("Supabase invoke error:", error);
       throw new Error(error.message || "Falha ao criar prévia.");
     }
 
-    if (!data?.ok) {
-      // sua edge function parece retornar { ok: false, error, details }
-      throw new Error(data?.error || "Falha ao criar prévia.");
+    // Se sua function retorna { ok: false, error: "...", details: ... }
+    if (data && data.ok === false) {
+      console.error("create_preview returned ok:false", data);
+      throw new Error(data.error || "Falha ao criar prévia.");
     }
 
-    return data;
+    // Se não tiver ok explícito, assume sucesso
+    return data || {};
   }
 
   async function handleSubmit(e) {
@@ -64,17 +65,35 @@ export default function FreeTastingPage() {
     try {
       setStatusMsg("Gerando prévia…");
 
-      // ✅ IMPORTANTE: campos com nomes que sua edge function espera (pdf_url, leilao_url...)
+      const pdf = urlPdf.trim();
+      const leilao = editalLink.trim();
+
+      // ✅ COMPATIBILIDADE TOTAL:
+      // manda os nomes “antigos” e “novos”
       const res = await callCreatePreview({
-        pdf_url: urlPdf.trim(),
-        leilao_url: editalLink.trim(),
+        // antigos (provável que era isso que funcionava antes)
+        url_pdf: pdf,
+        edital_link: leilao,
+
+        // novos (caso sua function já tenha sido atualizada)
+        pdf_url: pdf,
+        leilao_url: leilao,
+
+        // comuns
         nome: nome.trim(),
         whatsapp: whats,
         email: email.trim(),
       });
 
-      const reportUrl =
-        res?.report_url || `/relatorio?id=${encodeURIComponent(res.id)}&t=${encodeURIComponent(res.access_token || res.token)}`;
+      const id = res?.id;
+      const token = res?.access_token || res?.token || res?.t;
+      const reportUrl = res?.report_url || (id && token ? `/relatorio?id=${encodeURIComponent(id)}&t=${encodeURIComponent(token)}` : null);
+
+      if (!reportUrl) {
+        console.warn("Resposta não trouxe report_url nem id/token:", res);
+        setStatusMsg("Prévia criada, mas não consegui abrir o relatório automaticamente. Veja o console.");
+        return;
+      }
 
       window.location.href = reportUrl;
     } catch (err) {
