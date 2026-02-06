@@ -28,11 +28,9 @@ export default function FreeTastingPage() {
     });
 
     const data = await resp.json().catch(() => ({}));
-
     if (!resp.ok || !data?.ok) {
       throw new Error(data?.error || "Falha ao criar prévia.");
     }
-
     return data;
   }
 
@@ -63,8 +61,8 @@ export default function FreeTastingPage() {
       const pdf = urlPdf.trim();
       const leilao = editalLink.trim();
 
-      // ✅ manda payload compatível (antigo + novo)
       const res = await callCreatePreview({
+        // formatos antigo e novo (compatível)
         url_pdf: pdf,
         edital_link: leilao,
         pdf_url: pdf,
@@ -76,8 +74,9 @@ export default function FreeTastingPage() {
 
       const id = res?.id;
       const token = res?.access_token || res?.token || res?.t;
-
-      const reportUrl = res?.report_url || (id && token ? `/relatorio?id=${encodeURIComponent(id)}&t=${encodeURIComponent(token)}` : null);
+      const reportUrl =
+        res?.report_url ||
+        (id && token ? `/relatorio?id=${encodeURIComponent(id)}&t=${encodeURIComponent(token)}` : null);
 
       if (!reportUrl) {
         setStatusMsg("Prévia criada, mas não consegui abrir o relatório automaticamente.");
@@ -133,7 +132,6 @@ export default function FreeTastingPage() {
                 required
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
-              <div className="mt-2 text-xs text-white/50">Cole o link da página onde o imóvel/lote está anunciado.</div>
             </div>
 
             <div>
