@@ -1,3 +1,5 @@
+// /api/create_preview.js
+
 function sendJson(res, status, payload) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -53,7 +55,10 @@ export default async function handler(req, res) {
     ).trim();
 
     if (!SUPABASE_URL) {
-      return sendJson(res, 500, { ok: false, error: "Missing env: SUPABASE_URL (or VITE_SUPABASE_URL)" });
+      return sendJson(res, 500, {
+        ok: false,
+        error: "Missing env: SUPABASE_URL (or VITE_SUPABASE_URL)",
+      });
     }
     if (!SERVICE_ROLE) {
       return sendJson(res, 500, { ok: false, error: "Missing env: SUPABASE_SERVICE_ROLE_KEY" });
@@ -97,44 +102,35 @@ export default async function handler(req, res) {
       email,
     };
 
-    // ✅ tenta nomes comuns
-    const fnCandidates = ["create_preview", "createPreview", "create-preview"];
+    // ✅ Endpoint REAL da function (conforme painel do Supabase)
+    const fnName = "rapid-worker";
 
-    const attempts = [];
-    for (const fnName of fnCandidates) {
-      const r = await callFn({
-        supabaseUrl: SUPABASE_URL,
-        serviceRole: SERVICE_ROLE,
-        fnName,
-        body: payload,
-      });
+    const r = await callFn({
+      supabaseUrl: SUPABASE_URL,
+      serviceRole: SERVICE_ROLE,
+      fnName,
+      body: payload,
+    });
 
-      attempts.push({ fnName, status: r.status, functionUrl: r.functionUrl, data: r.data || null });
-
-      if (r.ok) {
-        return sendJson(res, 200, r.data);
-      }
-
-      // Se foi NOT_FOUND 404, continua tentando
-      if (r.status !== 404) {
-        // qualquer outro erro, já devolve
-        return sendJson(res, 500, {
-          ok: false,
-          error: r.data?.error || "Falha ao criar prévia.",
-          details: r.data?.details || r.data || r.raw || null,
-          debug: { attempts },
-        });
-      }
+    if (r.ok) {
+      return sendJson(res, 200, r.data);
     }
 
-    // nenhuma function existe
     return sendJson(res, 500, {
       ok: false,
-      error: "Nenhuma Edge Function encontrada no Supabase com nomes testados.",
-      details: "Crie/deploy a function com o nome correto (ex: create_preview) no projeto Supabase configurado.",
-      debug: { attempts, usedSupabaseUrl: SUPABASE_URL },
+      error: r.data?.error || "Falha ao criar prévia (create_preview).",
+      details: r.data?.details || r.data || r.raw || null,
+      debug: {
+        status: r.status,
+        functionUrl: r.functionUrl,
+        fnNameUsed: fnName,
+      },
     });
   } catch (err) {
-    return sendJson(res, 500, { ok: false, error: "Unhandled error", details: String(err?.message || err) });
+    return sendJson(res, 500, {
+      ok: false,
+      error: "Unhandled error",
+      details: String(err?.message || err),
+    });
   }
 }
