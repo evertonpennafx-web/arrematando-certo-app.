@@ -17,25 +17,14 @@ export default function FreeTastingPage() {
 
   function looksLikePdfUrl(u) {
     const s = String(u || "").trim().toLowerCase();
-    // aceita .pdf no final ou antes de querystring
     return s.includes(".pdf");
   }
 
   async function callCreatePreview(payload) {
-    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-    const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
-
-    if (!SUPABASE_URL || !ANON) {
-      throw new Error("Env faltando: VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY");
-    }
-
-    const resp = await fetch(`${SUPABASE_URL}/functions/v1/create_preview`, {
+    // ✅ chama sua Vercel API (mesmo domínio) -> sem CORS
+    const resp = await fetch("/api/create_preview", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: ANON,
-        authorization: `Bearer ${ANON}`,
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
 
@@ -50,7 +39,6 @@ export default function FreeTastingPage() {
     e.preventDefault();
     setStatusMsg("");
 
-    // ✅ todos obrigatórios
     if (!urlPdf.trim()) return setStatusMsg("Cole o link direto do PDF do edital.");
     if (!looksLikePdfUrl(urlPdf))
       return setStatusMsg(
@@ -70,6 +58,7 @@ export default function FreeTastingPage() {
 
     try {
       setStatusMsg("Gerando prévia…");
+
       const res = await callCreatePreview({
         url_pdf: urlPdf.trim(),
         edital_link: editalLink.trim(),
@@ -161,9 +150,6 @@ export default function FreeTastingPage() {
                 required
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
-              <div className="mt-2 text-xs text-white/50">
-                Usamos apenas para suporte e contato sobre a análise.
-              </div>
             </div>
 
             <div>
@@ -178,9 +164,6 @@ export default function FreeTastingPage() {
                 required
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
-              <div className="mt-2 text-xs text-white/50">
-                Usamos para enviar atualizações e confirmar a entrega do relatório.
-              </div>
             </div>
 
             <button
