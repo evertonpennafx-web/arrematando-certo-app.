@@ -1,165 +1,164 @@
-import { useMemo, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { createClient } from "@supabase/supabase-js";
 
-const FREE_LIMIT_PER_DAY = 1;
-const LS_KEY_DAY = "ac_free_day";
-const LS_KEY_COUNT = "ac_free_count";
-
-function todayKey() {
-  const d = new Date();
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${yyyy}-${mm}-${dd}`;
+function json(res, status, body) {
+  res.statusCode = status;
+  res.setHeader("Content-Type", "application/json; charset=utf-8");
+  res.end(JSON.stringify(body));
 }
 
-export default function Analisar() {
-  const [texto, setTexto] = useState("");
-  const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+function nowIso() {
+  return new Date().toISOString();
+}
 
-  const { remaining, blocked } = useMemo(() => {
-    const day = todayKey();
-    const savedDay = localStorage.getItem(LS_KEY_DAY);
-    let count = Number(localStorage.getItem(LS_KEY_COUNT) || "0");
+function buildMockReportHtml({ nome = "Cliente", pdfUrl = "" }) {
+  return `
+  <div style="font-family: Arial, sans-serif; line-height: 1.5;">
+    <h1 style="margin: 0 0 8px 0;">Relatório de Análise (Preview)</h1>
+    <p style="margin: 0 0 16px 0; color: #444;">
+      Olá <b>${nome}</b>, aqui vai um preview gerado automaticamente.
+    </p>
 
-    if (savedDay !== day) {
-      localStorage.setItem(LS_KEY_DAY, day);
-      localStorage.setItem(LS_KEY_COUNT, "0");
-      count = 0;
+    <h2>Pontos principais</h2>
+    <ul>
+      <li><b>Status do edital:</b> Documento recebido e processado.</li>
+      <li><b>Observação:</b> Esta versão é um mock para validar o pipeline end-to-end.</li>
+      <li><b>Próximo passo:</b> Substituir o mock por leitura real do PDF + IA.</li>
+    </ul>
+
+    <h2>Arquivo enviado</h2>
+    <p>
+      <a href="${pdfUrl}" target="_blank" rel="noreferrer">Abrir PDF</a>
+    </p>
+
+    <hr style="margin: 24px 0;" />
+    <p style="color:#777; font-size: 12px;">
+      Gerado em ${new Date().toLocaleString("pt-BR")}
+    </p>
+  </div>
+  `;
+}
+
+export default async function handler(req, res) {
+  try {
+    if (req.method !== "POST") {
+      return json(res, 405, { error: "Method not allowed" });
     }
 
-    const rem = Math.max(0, FREE_LIMIT_PER_DAY - count);
-    return { remaining: rem, blocked: rem <= 0 };
-  }, []);
+    const { id } = req.body || {};
+    if (!id) return json(res, 400, { error: "Missing 'id' in body" });
 
-  async function handleAnalisar() {
-    if (!texto.trim()) return;
+    // ✅ ENV VARS (CORRETAS)
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-    // bloqueio grátis
-    if (blocked) {
-      alert("Você já usou sua análise grátis de hoje. Assine para análises ilimitadas.");
-      navigate("/submission?plan=standard");
-      return;
+    // 🔥 ERRO CLARO se estiver faltando
+    if (!supabaseUrl) {
+      console.error("ENV missing: SUPABASE_URL");
+      return json(res, 500, { error: "Server misconfigured: SUPABASE_URL missing" });
+    }
+    if (!serviceRoleKey) {
+      console.error("ENV missing: SUPABASE_SERVICE_ROLE_KEY");
+      return json(res, 500, { error: "Server misconfigured: SUPABASE_SERVICE_ROLE_KEY missing" });
     }
 
-    setLoading(true);
+    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false },
+    });
 
+    // 1) Busca registro
+    const { data: row, error: fetchErr } = await supabase
+      .from("preview_gratuito")
+      .select("id, nome, email, whatsapp, url_pdf, edital_link, status")
+      .eq("id", id)
+      .single();
+
+    if (fetchErr) {
+      console.error("Fetch error:", fetchErr);
+      return json(res, 404, { error: "Registro não encontrado", details: fetchErr.message });
+    }
+
+    // 2) Marca como processing
+    await supabase
+      .from("preview_gratuito")
+      .update({ status: "processing", updated_at: nowIso() })
+      .eq("id", id);
+
+    // 3) Pega fonte (PDF ou link)
+    const pdfUrl = row.url_pdf || "";
+    const editalLink = row.edital_link || "";
+
+    if (!pdfUrl && !editalLink) {
+      await supabase
+        .from("preview_gratuito")
+        .update({
+          status: "error",
+          error_message: "Nenhum PDF ou link de edital encontrado",
+          updated_at: nowIso(),
+        })
+        .eq("id", id);
+
+      return json(res, 400, { error: "Nenhum PDF ou link foi encontrado no registro" });
+    }
+
+    // 4) (Mock) Gera relatório
+    const reportHtml = buildMockReportHtml({ nome: row.nome, pdfUrl });
+    const resultJson = {
+      mode: "mock",
+      source: pdfUrl ? "pdf" : "link",
+      pdfUrl,
+      editalLink,
+      generated_at: nowIso(),
+      summary: {
+        riscos: ["Mock: validar pipeline"],
+        pontos_atencao: ["Mock: substituir por IA"],
+        recomendacao: "Mock: relatório gerado com sucesso.",
+      },
+    };
+
+    // 5) Atualiza como done
+    const { error: updateErr } = await supabase
+      .from("preview_gratuito")
+      .update({
+        status: "done",
+        report_html: reportHtml,
+        result_json: resultJson,
+        analyzed_at: nowIso(),
+        updated_at: nowIso(),
+        error_message: null,
+      })
+      .eq("id", id);
+
+    if (updateErr) {
+      console.error("Update error:", updateErr);
+      return json(res, 500, { error: "Falha ao salvar relatório", details: updateErr.message });
+    }
+
+    return json(res, 200, { ok: true, id });
+  } catch (err) {
+    console.error("Unhandled error:", err);
+
+    // tenta marcar no banco como error se possível (sem quebrar)
     try {
-      const resp = await fetch("/api/analisar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ texto }),
-      });
-
-      const json = await resp.json();
-
-      if (!resp.ok) {
-        alert(json?.error || "Erro ao analisar");
-        return;
+      const { id } = req.body || {};
+      const supabaseUrl = process.env.SUPABASE_URL;
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (id && supabaseUrl && serviceRoleKey) {
+        const supabase = createClient(supabaseUrl, serviceRoleKey, {
+          auth: { persistSession: false },
+        });
+        await supabase
+          .from("preview_gratuito")
+          .update({
+            status: "error",
+            error_message: String(err?.message || err),
+            updated_at: nowIso(),
+          })
+          .eq("id", id);
       }
-
-      // salva resultado
-      localStorage.setItem("ac_ultimo_resultado", JSON.stringify(json.data));
-
-      // incrementa uso diário
-      const count = Number(localStorage.getItem(LS_KEY_COUNT) || "0");
-      localStorage.setItem(LS_KEY_COUNT, String(count + 1));
-
-      navigate("/resultado");
     } catch (e) {
-      alert("Erro de conexão");
-    } finally {
-      setLoading(false);
+      console.error("Failed to mark error in DB:", e);
     }
+
+    return json(res, 500, { error: "Erro interno", details: String(err?.message || err) });
   }
-
-  return (
-    <div style={{ minHeight: "100vh", background: "#0b0b0b", color: "#fff", padding: 24 }}>
-      <div style={{ maxWidth: 980, margin: "0 auto" }}>
-        <Link to="/" style={{ color: "#bbb", textDecoration: "none" }}>← Voltar</Link>
-
-        <h1 style={{ margin: "12px 0 6px 0", fontSize: 22 }}>Analisar edital</h1>
-        <p style={{ opacity: 0.85, marginTop: 0 }}>
-          Grátis: <b>{remaining}</b> análise(s) restante(s) hoje.
-          {" "}
-          {blocked ? (
-            <span style={{ color: "#f87171" }}>Limite atingido.</span>
-          ) : (
-            <span style={{ color: "#86efac" }}>Disponível.</span>
-          )}
-        </p>
-
-        {blocked && (
-          <div style={{ border: "1px solid #222", borderRadius: 14, padding: 14, background: "#111", marginTop: 12 }}>
-            <b>Você já usou sua análise grátis hoje.</b>
-            <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-              <button
-                onClick={() => navigate("/submission?plan=standard")}
-                style={{ padding: "10px 14px", borderRadius: 12, border: "none", background: "#22c55e", color: "#000", fontWeight: 900, cursor: "pointer" }}
-              >
-                Destravar ilimitado (mensal)
-              </button>
-              <button
-                onClick={() => navigate("/submission?plan=express")}
-                style={{ padding: "10px 14px", borderRadius: 12, border: "1px solid #333", background: "transparent", color: "#fff", fontWeight: 800, cursor: "pointer" }}
-              >
-                Quero Express
-              </button>
-            </div>
-          </div>
-        )}
-
-        <textarea
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          placeholder="Cole o texto do edital aqui…"
-          style={{
-            width: "100%",
-            minHeight: 300,
-            background: "#111",
-            color: "#fff",
-            border: "1px solid #222",
-            borderRadius: 12,
-            padding: 12,
-            outline: "none",
-            marginTop: 14,
-          }}
-        />
-
-        <div style={{ marginTop: 12, display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <button
-            onClick={handleAnalisar}
-            disabled={loading || !texto.trim()}
-            style={{
-              padding: "12px 14px",
-              background: loading ? "#14532d" : "#22c55e",
-              color: "#000",
-              border: "none",
-              borderRadius: 10,
-              fontWeight: 900,
-              cursor: loading ? "not-allowed" : "pointer",
-            }}
-          >
-            {loading ? "Analisando..." : "Gerar relatório"}
-          </button>
-
-          <button
-            onClick={() => navigate("/submission?plan=standard")}
-            style={{
-              padding: "12px 14px",
-              background: "transparent",
-              color: "#fff",
-              border: "1px solid #333",
-              borderRadius: 10,
-              cursor: "pointer",
-              fontWeight: 800,
-            }}
-          >
-            Ver planos (mensal)
-          </button>
-        </div>
-      </div>
-    </div>
-  );
 }
