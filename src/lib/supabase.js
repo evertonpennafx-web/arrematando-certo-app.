@@ -1,19 +1,17 @@
 // lib/supabase.js
 import { createClient } from "@supabase/supabase-js";
 
+// ⚠️ USAMOS APENAS AS VARS DO FRONT (VITE_*), COMO ERA ANTES
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
 if (!supabaseUrl) {
-  throw new Error("VITE_SUPABASE_URL não está definida nas env vars (Vercel/Vite).");
-}
-if (!supabaseAnonKey) {
-  throw new Error("VITE_SUPABASE_ANON_KEY não está definida nas env vars (Vercel/Vite).");
+  console.error("❌ VITE_SUPABASE_URL não definida");
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-  },
-});
+if (!supabaseAnonKey) {
+  console.error("❌ VITE_SUPABASE_ANON_KEY não definida");
+}
+
+// Client simples, browser, igual ao fluxo que funcionava
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
