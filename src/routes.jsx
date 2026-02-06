@@ -10,6 +10,9 @@ import ConsultationPage from "./pages/ConsultationPage";
 import EnviarEditalPage from "./pages/EnviarEditalPage";
 import SubmissionPage from "./pages/SubmissionPage";
 
+// ✅ IMPORTA O RELATÓRIO
+import RelatorioPage from "./pages/RelatorioPage";
+
 export default function AppRoutes() {
   return (
     <Routes>
@@ -23,6 +26,9 @@ export default function AppRoutes() {
 
       {/* PLANOS (usa query string ?plan=standard|express) */}
       <Route path="/submission" element={<SubmissionPage />} />
+
+      {/* ✅ ROTA DO RELATÓRIO (ERA ISSO QUE TAVA FALTANDO) */}
+      <Route path="/relatorio" element={<RelatorioPage />} />
 
       {/* MVP IA */}
       <Route path="/analisar" element={<Analisar />} />
