@@ -10,41 +10,50 @@ const supabase = createClient(
 
 export default function FreeTastingPage() {
   const navigate = useNavigate();
-  const [loading, setLoading] = useState(false);
-  const [file, setFile] = useState(null);
+
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [file, setFile] = useState(null);
+  const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (!file || !nome || !email) {
-      alert("Preencha todos os campos.");
+
+    if (!nome || !email || !file) {
+      alert("Preencha todos os campos obrigatórios.");
       return;
     }
 
     setLoading(true);
 
     try {
-      // 1️⃣ Upload do PDF
+      // 1️⃣ Upload do PDF no bucket CORRETO
       const fileName = `${Date.now()}-${file.name}`;
+
       const { error: uploadError } = await supabase.storage
-        .from("editais")
+        .from("pdfs")
         .upload(fileName, file);
 
-      if (uploadError) throw uploadError;
+      if (uploadError) {
+        console.error("Erro upload:", uploadError);
+        throw uploadError;
+      }
 
+      // 2️⃣ URL pública do PDF
       const { data: urlData } = supabase.storage
-        .from("editais")
+        .from("pdfs")
         .getPublicUrl(fileName);
 
       const pdfUrl = urlData.publicUrl;
 
-      // 2️⃣ Gera token
+      // 3️⃣ Token de acesso
       const accessToken = crypto.randomUUID();
-      const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1h
+      const expiresAt = new Date(
+        Date.now() + 60 * 60 * 1000
+      ).toISOString(); // 1h
 
-      // 3️⃣ Cria registro
+      // 4️⃣ Cria registro no preview_gratuito
       const { data, error } = await supabase
         .from("preview_gratuito")
         .insert({
@@ -59,22 +68,28 @@ export default function FreeTastingPage() {
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        console.error("Erro insert:", error);
+        throw error;
+      }
 
       const id = data.id;
 
-      // 4️⃣ DISPARA PROCESSAMENTO (🔥 A LINHA QUE FALTAVA)
+      // 5️⃣ DISPARA PROCESSAMENTO (sem await)
       fetch("/api/analisar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       });
 
-      // 5️⃣ REDIRECIONA
+      // 6️⃣ Redireciona para o relatório
       navigate(`/relatorio?id=${id}&t=${accessToken}`);
     } catch (err) {
       console.error(err);
-      alert("Erro ao enviar edital.");
+      alert(
+        err?.message ||
+        "Erro ao enviar edital. Verifique o arquivo e tente novamente."
+      );
     } finally {
       setLoading(false);
     }
