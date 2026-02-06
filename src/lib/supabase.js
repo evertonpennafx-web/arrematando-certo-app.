@@ -18,49 +18,118 @@ function assertSupabase() {
 }
 
 /**
- * Upload de PDF pro Storage (bucket padrão: 'uploads').
+ * Normaliza opts:
+ * - Se vier string => interpreta como { bucket: string }
+ * - Se vier objeto => usa normalmente
+ */
+function normalizeUploadOpts(opts) {
+  if (!opts) return {};
+  if (typeof opts === "string") return { bucket: opts };
+  if (typeof opts === "object") return opts;
+  return {};
+}
+
+/**
+ * Upload de PDF pro Storage.
+ * Aceita:
+ *  - uploadPdfToStorage(file, "nome_do_bucket")
+ *  - uploadPdfToStorage(file, { bucket: "nome", prefix: "pdf" })
+ *
  * Retorna: { path, publicUrl }
  */
 export async function uploadPdfToStorage(file, opts = {}) {
   assertSupabase();
 
-  const bucket = opts.bucket || "uploads";
-  const prefix = opts.prefix || "pdf";
-  const safeName = `${Date.now()}-${(file?.name || "arquivo.pdf").replace(/\s+/g, "_")}`;
+  const o = normalizeUploadOpts(opts);
+
+  const bucket = o.bucket || "uploads";
+  const prefix = o.prefix || "pdf";
+
+  const fileName = (file?.name || "arquivo.pdf").replace(/\s+/g, "_");
+  const safeName = `${Date.now()}-${fileName}`;
   const path = `${prefix}/${safeName}`;
 
   const { error: upErr } = await supabase.storage.from(bucket).upload(path, file, {
     upsert: true,
     contentType: file?.type || "application/pdf",
   });
-  if (upErr) throw upErr;
+
+  if (upErr) {
+    // Mantém o erro “cru” do Supabase (é ele que traz "Bucket not found")
+    throw upErr;
+  }
 
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
-  return { path, publicUrl: data?.publicUrl };
+  const publicUrl = data?.publicUrl || null;
+
+  return { path, publicUrl };
 }
 
 /**
- * Mantive essas funções “genéricas” pra não quebrar o build.
- * Você pode ajustar o nome das tabelas depois.
+ * Gera um token simples para acesso (client-side), mantendo seu padrão
+ * de retorno (id, access_token, report_url).
+ */
+function generateAccessToken() {
+  try {
+    // Browsers modernos
+    return crypto.randomUUID();
+  } catch {
+    // fallback
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+}
+
+/**
+ * Salva degustação gratuita (free_previews)
+ * Retorna no padrão esperado pelo seu frontend:
+ * { id, access_token, report_url }
  */
 export async function submitFreePreview(payload = {}) {
   assertSupabase();
-  // tenta salvar numa tabela padrão; se não existir, pelo menos a UI não “morre” silenciosamente
-  const { error } = await supabase.from("free_previews").insert([payload]);
+
+  const access_token = payload.access_token || generateAccessToken();
+
+  // garantimos que o token vá pro banco também (pra bater com /relatorio?id=...&t=...)
+  const rowToInsert = { ...payload, access_token };
+
+  // IMPORTANT: para receber id de volta, precisa select()
+  const { data, error } = await supabase
+    .from("free_previews")
+    .insert([rowToInsert])
+    .select("id, access_token, report_url")
+    .single();
+
   if (error) throw error;
-  return { ok: true };
+
+  return {
+    id: data?.id,
+    access_token: data?.access_token,
+    report_url: data?.report_url || null,
+  };
 }
 
 export async function submitPaidSubmission(payload = {}) {
   assertSupabase();
-  const { error } = await supabase.from("paid_submissions").insert([payload]);
+
+  const { data, error } = await supabase
+    .from("paid_submissions")
+    .insert([payload])
+    .select("id")
+    .single();
+
   if (error) throw error;
-  return { ok: true };
+  return { ok: true, id: data?.id };
 }
 
 export async function submitConsultationRequest(payload = {}) {
   assertSupabase();
-  const { error } = await supabase.from("consultation_requests").insert([payload]);
+
+  const { data, error } = await supabase
+    .from("consultation_requests")
+    .insert([payload])
+    .select("id")
+    .single();
+
   if (error) throw error;
-  return { ok: true };
+  return { ok: true, id: data?.id };
 }
