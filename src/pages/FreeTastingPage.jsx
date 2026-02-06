@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import Layout from "@/components/Layout";
-import { supabase } from "@/lib/supabase";
 
 export default function FreeTastingPage() {
   const [urlPdf, setUrlPdf] = useState("");
@@ -22,23 +21,17 @@ export default function FreeTastingPage() {
   }
 
   async function callCreatePreview(payload) {
-    const { data, error } = await supabase.functions.invoke("create_preview", {
-      body: payload,
+    const resp = await fetch("/api/create_preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
     });
 
-    if (error) {
-      console.error("Supabase invoke error:", error);
-      throw new Error(error.message || "Falha ao criar prévia.");
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data?.ok) {
+      throw new Error(data?.error || "Falha ao criar prévia.");
     }
-
-    // Se sua function retorna { ok: false, error: "...", details: ... }
-    if (data && data.ok === false) {
-      console.error("create_preview returned ok:false", data);
-      throw new Error(data.error || "Falha ao criar prévia.");
-    }
-
-    // Se não tiver ok explícito, assume sucesso
-    return data || {};
+    return data;
   }
 
   async function handleSubmit(e) {
@@ -68,32 +61,19 @@ export default function FreeTastingPage() {
       const pdf = urlPdf.trim();
       const leilao = editalLink.trim();
 
-      // ✅ COMPATIBILIDADE TOTAL:
-      // manda os nomes “antigos” e “novos”
+      // ✅ manda ambos formatos (compatível com qualquer function)
       const res = await callCreatePreview({
-        // antigos (provável que era isso que funcionava antes)
         url_pdf: pdf,
         edital_link: leilao,
-
-        // novos (caso sua function já tenha sido atualizada)
         pdf_url: pdf,
         leilao_url: leilao,
-
-        // comuns
         nome: nome.trim(),
         whatsapp: whats,
         email: email.trim(),
       });
 
-      const id = res?.id;
-      const token = res?.access_token || res?.token || res?.t;
-      const reportUrl = res?.report_url || (id && token ? `/relatorio?id=${encodeURIComponent(id)}&t=${encodeURIComponent(token)}` : null);
-
-      if (!reportUrl) {
-        console.warn("Resposta não trouxe report_url nem id/token:", res);
-        setStatusMsg("Prévia criada, mas não consegui abrir o relatório automaticamente. Veja o console.");
-        return;
-      }
+      const reportUrl =
+        res?.report_url || `/relatorio?id=${encodeURIComponent(res.id)}&t=${encodeURIComponent(res.access_token || res.token)}`;
 
       window.location.href = reportUrl;
     } catch (err) {
@@ -119,8 +99,7 @@ export default function FreeTastingPage() {
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
               <label className="block text-sm font-semibold text-white/80">
-                🔗 Link direto do PDF do edital{" "}
-                <span className="text-[#d4af37]">(obrigatório)</span>
+                🔗 Link direto do PDF do edital <span className="text-[#d4af37]">(obrigatório)</span>
               </label>
               <input
                 value={urlPdf}
@@ -130,8 +109,7 @@ export default function FreeTastingPage() {
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
               <div className="mt-2 text-xs text-white/50">
-                Como pegar: no site do leilão, clique em <b>“Edital (PDF)”</b> ou{" "}
-                <b>“Baixar edital”</b>, abra o PDF e copie o link do navegador.
+                Como pegar: no site do leilão, clique em <b>“Edital (PDF)”</b> ou <b>“Baixar edital”</b>, abra o PDF e copie o link do navegador.
               </div>
             </div>
 
@@ -146,9 +124,7 @@ export default function FreeTastingPage() {
                 required
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
-              <div className="mt-2 text-xs text-white/50">
-                Cole o link da página onde o imóvel/lote está anunciado.
-              </div>
+              <div className="mt-2 text-xs text-white/50">Cole o link da página onde o imóvel/lote está anunciado.</div>
             </div>
 
             <div>
@@ -201,9 +177,7 @@ export default function FreeTastingPage() {
 
             {statusMsg ? <div className="text-sm text-white/70">{statusMsg}</div> : null}
 
-            <div className="text-xs text-white/50">
-              * Prévia automática. Não substitui análise jurídica.
-            </div>
+            <div className="text-xs text-white/50">* Prévia automática. Não substitui análise jurídica.</div>
           </form>
         </div>
       </div>
