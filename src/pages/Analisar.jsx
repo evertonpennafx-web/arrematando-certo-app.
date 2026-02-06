@@ -1,9 +1,9 @@
 import { createClient } from "@supabase/supabase-js";
 
-function json(res, status, data) {
+function sendJson(res, status, payload) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.end(JSON.stringify(data));
+  res.end(JSON.stringify(payload));
 }
 
 export default async function handler(req, res) {
@@ -12,18 +12,40 @@ export default async function handler(req, res) {
   res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
-  if (req.method === "OPTIONS") return res.status(204).end();
-  if (req.method !== "POST") return json(res, 405, { error: "Method not allowed" });
+  if (req.method === "OPTIONS") {
+    res.statusCode = 204;
+    return res.end();
+  }
+
+  if (req.method !== "POST") {
+    return sendJson(res, 405, { error: "Method not allowed" });
+  }
 
   try {
-    const SUPABASE_URL = process.env.SUPABASE_URL;
-    const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    // ✅ Backend envs (corretas)
+    // (fallback pro VITE_ só pra não travar se você setou errado)
+    const SUPABASE_URL =
+      process.env.SUPABASE_URL ||
+      process.env.VITE_SUPABASE_URL ||
+      "";
+
+    const SUPABASE_SERVICE_ROLE_KEY =
+      process.env.SUPABASE_SERVICE_ROLE_KEY ||
+      process.env.SUPABASE_SERVICE_KEY ||
+      "";
 
     if (!SUPABASE_URL) {
-      return json(res, 500, { error: "Missing env: SUPABASE_URL" });
+      return sendJson(res, 500, {
+        error: "Missing env: SUPABASE_URL",
+        hint: "Crie SUPABASE_URL na Vercel e faça um novo deploy (redeploy do mais recente).",
+      });
     }
+
     if (!SUPABASE_SERVICE_ROLE_KEY) {
-      return json(res, 500, { error: "Missing env: SUPABASE_SERVICE_ROLE_KEY" });
+      return sendJson(res, 500, {
+        error: "Missing env: SUPABASE_SERVICE_ROLE_KEY",
+        hint: "Crie SUPABASE_SERVICE_ROLE_KEY na Vercel (sem VITE_) e faça um novo deploy.",
+      });
     }
 
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -33,11 +55,15 @@ export default async function handler(req, res) {
     // parse body
     let body = req.body;
     if (typeof body === "string") {
-      body = JSON.parse(body);
+      try {
+        body = JSON.parse(body);
+      } catch (e) {
+        return sendJson(res, 400, { error: "Invalid JSON body" });
+      }
     }
 
     const { id } = body || {};
-    if (!id) return json(res, 400, { error: "Missing required field: id" });
+    if (!id) return sendJson(res, 400, { error: "Missing required field: id" });
 
     // 1) busca registro
     const { data: row, error: fetchErr } = await supabase
@@ -47,16 +73,19 @@ export default async function handler(req, res) {
       .single();
 
     if (fetchErr || !row) {
-      return json(res, 404, { error: "Registro não encontrado", details: fetchErr?.message });
+      return sendJson(res, 404, {
+        error: "Registro não encontrado",
+        details: fetchErr?.message || null,
+      });
     }
 
-    // 2) marca como processing (opcional mas bom)
+    // 2) marca como processing
     await supabase
       .from("preview_gratuito")
       .update({ status: "processing", error_message: null })
       .eq("id", id);
 
-    // 3) GERA RELATÓRIO (mock por enquanto — só pra “ligar o fio”)
+    // 3) GERA RELATÓRIO (mock)
     const fonte = row.edital_link || row.url_pdf || "(sem fonte)";
     const now = new Date().toISOString();
 
@@ -70,7 +99,8 @@ export default async function handler(req, res) {
           "Confirme condições de pagamento e comissão do leiloeiro.",
           "Cheque débitos/ônus e possibilidade de desocupação.",
         ],
-        recomendacao: "Análise preliminar automática. Recomenda-se revisão completa antes de arrematar.",
+        recomendacao:
+          "Análise preliminar automática. Recomenda-se revisão completa antes de arrematar.",
       },
     };
 
@@ -133,11 +163,11 @@ export default async function handler(req, res) {
       .eq("id", id);
 
     if (updErr) {
-      return json(res, 500, { error: "Falha ao atualizar registro", details: updErr.message });
+      return sendJson(res, 500, { error: "Falha ao atualizar registro", details: updErr.message });
     }
 
-    return json(res, 200, { ok: true, id });
+    return sendJson(res, 200, { ok: true, id });
   } catch (err) {
-    return json(res, 500, { error: "Unhandled error", details: String(err?.message || err) });
+    return sendJson(res, 500, { error: "Unhandled error", details: String(err?.message || err) });
   }
 }
