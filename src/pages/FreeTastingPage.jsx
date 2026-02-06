@@ -15,6 +15,12 @@ export default function FreeTastingPage() {
     return String(v || "").replace(/\D/g, "");
   }
 
+  function looksLikePdfUrl(u) {
+    const s = String(u || "").trim().toLowerCase();
+    // aceita .pdf no final ou antes de querystring
+    return s.includes(".pdf");
+  }
+
   async function callCreatePreview(payload) {
     const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
     const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -45,7 +51,12 @@ export default function FreeTastingPage() {
     setStatusMsg("");
 
     // ✅ todos obrigatórios
-    if (!urlPdf.trim()) return setStatusMsg("Cole a URL do PDF do edital.");
+    if (!urlPdf.trim()) return setStatusMsg("Cole o link direto do PDF do edital.");
+    if (!looksLikePdfUrl(urlPdf))
+      return setStatusMsg(
+        "Parece que esse link não é do PDF. Abra o edital no site do leilão, copie o link que abre o PDF (geralmente contém .pdf) e cole aqui.",
+      );
+
     if (!editalLink.trim()) return setStatusMsg("Informe o link do leilão.");
     if (!nome.trim()) return setStatusMsg("Informe seu nome.");
     if (!whatsapp.trim()) return setStatusMsg("Informe seu WhatsApp.");
@@ -85,35 +96,45 @@ export default function FreeTastingPage() {
           <h1 className="text-2xl font-bold">Degustação Gratuita</h1>
 
           <p className="mt-2 text-white/70">
-            Cole a <b>URL do PDF do edital</b> e preencha seus dados para gerar uma{" "}
-            <b>prévia automática</b>.
+            Cole o <b>link direto do PDF do edital</b> para gerar uma <b>prévia automática</b>.
+            <br />
+            ⚠️ <b>Não é upload de arquivo.</b> É só copiar o link do PDF que abre no navegador
+            (normalmente contém <code>.pdf</code>).
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
               <label className="block text-sm font-semibold text-white/80">
-                URL do PDF do edital <span className="text-[#d4af37]">(obrigatório)</span>
+                🔗 Link direto do PDF do edital{" "}
+                <span className="text-[#d4af37]">(obrigatório)</span>
               </label>
               <input
                 value={urlPdf}
                 onChange={(e) => setUrlPdf(e.target.value)}
-                placeholder="https://.../edital.pdf"
+                placeholder="Ex: https://site-do-leilao.com.br/editais/edital123.pdf"
                 required
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
+              <div className="mt-2 text-xs text-white/50">
+                Como pegar: no site do leilão, clique em <b>“Edital (PDF)”</b> ou{" "}
+                <b>“Baixar edital”</b>, abra o PDF e copie o link do navegador.
+              </div>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-white/80">
-                Link do leilão <span className="text-[#d4af37]">(obrigatório)</span>
+                🌐 Link do leilão <span className="text-[#d4af37]">(obrigatório)</span>
               </label>
               <input
                 value={editalLink}
                 onChange={(e) => setEditalLink(e.target.value)}
-                placeholder="https://... (página do leilão)"
+                placeholder="Ex: https://... (página do leilão)"
                 required
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
+              <div className="mt-2 text-xs text-white/50">
+                Cole o link da página onde o imóvel/lote está anunciado.
+              </div>
             </div>
 
             <div>
@@ -123,7 +144,7 @@ export default function FreeTastingPage() {
               <input
                 value={nome}
                 onChange={(e) => setNome(e.target.value)}
-                placeholder="Seu nome"
+                placeholder="Seu nome completo"
                 required
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
@@ -140,6 +161,9 @@ export default function FreeTastingPage() {
                 required
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
+              <div className="mt-2 text-xs text-white/50">
+                Usamos apenas para suporte e contato sobre a análise.
+              </div>
             </div>
 
             <div>
@@ -154,6 +178,9 @@ export default function FreeTastingPage() {
                 required
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
+              <div className="mt-2 text-xs text-white/50">
+                Usamos para enviar atualizações e confirmar a entrega do relatório.
+              </div>
             </div>
 
             <button
@@ -161,7 +188,7 @@ export default function FreeTastingPage() {
               disabled={loading}
               className="w-full rounded-xl bg-[#d4af37] px-6 py-4 text-center font-extrabold text-black disabled:opacity-60"
             >
-              {loading ? "Gerando…" : "Gerar Relatório"}
+              {loading ? "Gerando…" : "Gerar prévia gratuita do relatório"}
             </button>
 
             {statusMsg ? <div className="text-sm text-white/70">{statusMsg}</div> : null}
