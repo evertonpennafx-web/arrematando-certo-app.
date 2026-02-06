@@ -1,4 +1,3 @@
-// /api/create_preview.js
 function sendJson(res, status, payload) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
@@ -7,6 +6,30 @@ function sendJson(res, status, payload) {
 
 function normUrl(u) {
   return String(u || "").trim().replace(/\/+$/, "");
+}
+
+async function callFn({ supabaseUrl, serviceRole, fnName, body }) {
+  const functionUrl = `${supabaseUrl}/functions/v1/${fnName}`;
+
+  const fnResp = await fetch(functionUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      apikey: serviceRole,
+      authorization: `Bearer ${serviceRole}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  const txt = await fnResp.text().catch(() => "");
+  let data = null;
+  try {
+    data = txt ? JSON.parse(txt) : null;
+  } catch {
+    data = null;
+  }
+
+  return { ok: fnResp.ok && data?.ok, status: fnResp.status, functionUrl, data, raw: txt };
 }
 
 export default async function handler(req, res) {
@@ -25,7 +48,9 @@ export default async function handler(req, res) {
 
   try {
     const SUPABASE_URL = normUrl(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL);
-    const SERVICE_ROLE = String(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "").trim();
+    const SERVICE_ROLE = String(
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "",
+    ).trim();
 
     if (!SUPABASE_URL) {
       return sendJson(res, 500, { ok: false, error: "Missing env: SUPABASE_URL (or VITE_SUPABASE_URL)" });
@@ -34,7 +59,6 @@ export default async function handler(req, res) {
       return sendJson(res, 500, { ok: false, error: "Missing env: SUPABASE_SERVICE_ROLE_KEY" });
     }
 
-    // parse body
     let body = req.body;
     if (typeof body === "string") {
       try {
@@ -63,44 +87,53 @@ export default async function handler(req, res) {
       });
     }
 
-    const functionUrl = `${SUPABASE_URL}/functions/v1/create_preview`;
+    const payload = {
+      url_pdf,
+      edital_link,
+      pdf_url: url_pdf,
+      leilao_url: edital_link,
+      nome,
+      whatsapp,
+      email,
+    };
 
-    const fnResp = await fetch(functionUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: SERVICE_ROLE,
-        authorization: `Bearer ${SERVICE_ROLE}`,
-      },
-      body: JSON.stringify({
-        url_pdf,
-        edital_link,
-        pdf_url: url_pdf,
-        leilao_url: edital_link,
-        nome,
-        whatsapp,
-        email,
-      }),
-    });
+    // ✅ tenta nomes comuns
+    const fnCandidates = ["create_preview", "createPreview", "create-preview"];
 
-    const txt = await fnResp.text().catch(() => "");
-    let data = null;
-    try {
-      data = txt ? JSON.parse(txt) : null;
-    } catch {
-      data = null;
-    }
-
-    if (!fnResp.ok || !data?.ok) {
-      return sendJson(res, 500, {
-        ok: false,
-        error: data?.error || "Falha ao criar prévia (create_preview).",
-        details: data?.details || data || txt || null,
-        debug: { status: fnResp.status, functionUrl },
+    const attempts = [];
+    for (const fnName of fnCandidates) {
+      const r = await callFn({
+        supabaseUrl: SUPABASE_URL,
+        serviceRole: SERVICE_ROLE,
+        fnName,
+        body: payload,
       });
+
+      attempts.push({ fnName, status: r.status, functionUrl: r.functionUrl, data: r.data || null });
+
+      if (r.ok) {
+        return sendJson(res, 200, r.data);
+      }
+
+      // Se foi NOT_FOUND 404, continua tentando
+      if (r.status !== 404) {
+        // qualquer outro erro, já devolve
+        return sendJson(res, 500, {
+          ok: false,
+          error: r.data?.error || "Falha ao criar prévia.",
+          details: r.data?.details || r.data || r.raw || null,
+          debug: { attempts },
+        });
+      }
     }
 
-    return sendJson(res, 200, data);
+    // nenhuma function existe
+    return sendJson(res, 500, {
+      ok: false,
+      error: "Nenhuma Edge Function encontrada no Supabase com nomes testados.",
+      details: "Crie/deploy a function com o nome correto (ex: create_preview) no projeto Supabase configurado.",
+      debug: { attempts, usedSupabaseUrl: SUPABASE_URL },
+    });
   } catch (err) {
     return sendJson(res, 500, { ok: false, error: "Unhandled error", details: String(err?.message || err) });
   }
