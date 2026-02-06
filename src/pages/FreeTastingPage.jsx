@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 
 export default function FreeTastingPage() {
@@ -10,6 +10,11 @@ export default function FreeTastingPage() {
 
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
+
+  // ✅ Marcador pra você ter certeza que a versão certa subiu
+  useEffect(() => {
+    console.log("✅ FreeTastingPage vAPI (chamando /api/create_preview) carregado");
+  }, []);
 
   function digitsOnly(v) {
     return String(v || "").replace(/\D/g, "");
@@ -62,7 +67,7 @@ export default function FreeTastingPage() {
       const leilao = editalLink.trim();
 
       const res = await callCreatePreview({
-        // formatos antigo e novo (compatível)
+        // compatível antigo + novo
         url_pdf: pdf,
         edital_link: leilao,
         pdf_url: pdf,
@@ -74,6 +79,7 @@ export default function FreeTastingPage() {
 
       const id = res?.id;
       const token = res?.access_token || res?.token || res?.t;
+
       const reportUrl =
         res?.report_url ||
         (id && token ? `/relatorio?id=${encodeURIComponent(id)}&t=${encodeURIComponent(token)}` : null);
@@ -107,7 +113,8 @@ export default function FreeTastingPage() {
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
               <label className="block text-sm font-semibold text-white/80">
-                🔗 Link direto do PDF do edital <span className="text-[#d4af37]">(obrigatório)</span>
+                🔗 Link direto do PDF do edital{" "}
+                <span className="text-[#d4af37]">(obrigatório)</span>
               </label>
               <input
                 value={urlPdf}
@@ -117,7 +124,8 @@ export default function FreeTastingPage() {
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
               <div className="mt-2 text-xs text-white/50">
-                Como pegar: no site do leilão, clique em <b>“Edital (PDF)”</b> ou <b>“Baixar edital”</b>, abra o PDF e copie o link do navegador.
+                Como pegar: no site do leilão, clique em <b>“Edital (PDF)”</b> ou{" "}
+                <b>“Baixar edital”</b>, abra o PDF e copie o link do navegador.
               </div>
             </div>
 
@@ -132,6 +140,9 @@ export default function FreeTastingPage() {
                 required
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
+              <div className="mt-2 text-xs text-white/50">
+                Cole o link da página onde o imóvel/lote está anunciado.
+              </div>
             </div>
 
             <div>
@@ -184,7 +195,9 @@ export default function FreeTastingPage() {
 
             {statusMsg ? <div className="text-sm text-white/70">{statusMsg}</div> : null}
 
-            <div className="text-xs text-white/50">* Prévia automática. Não substitui análise jurídica.</div>
+            <div className="text-xs text-white/50">
+              * Prévia automática. Não substitui análise jurídica.
+            </div>
           </form>
         </div>
       </div>
