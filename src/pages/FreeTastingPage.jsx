@@ -1,11 +1,8 @@
-import React, { useMemo, useState } from "react";
+import React, { useState } from "react";
 import Layout from "@/components/Layout";
-import customSupabaseClient from "@/lib/customSupabaseClient";
 
 export default function FreeTastingPage() {
-  const supabase = useMemo(() => customSupabaseClient, []);
-  const [file, setFile] = useState(null);
-
+  const [urlPdf, setUrlPdf] = useState("");
   const [editalLink, setEditalLink] = useState("");
   const [nome, setNome] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
@@ -14,26 +11,8 @@ export default function FreeTastingPage() {
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
 
-  const BUCKET = "edital-pdfs"; // troque se seu bucket tiver outro nome
-
   function digitsOnly(v) {
     return String(v || "").replace(/\D/g, "");
-  }
-
-  async function uploadPdfToStorage(pdfFile) {
-    const path = `previews/${Date.now()}-${Math.random().toString(16).slice(2)}.pdf`;
-
-    const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, pdfFile, {
-      contentType: "application/pdf",
-      upsert: false,
-    });
-
-    if (upErr) throw new Error(`Falha ao enviar PDF: ${upErr.message}`);
-
-    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-    if (!data?.publicUrl) throw new Error("Não foi possível obter URL pública do PDF.");
-
-    return data.publicUrl;
   }
 
   async function callCreatePreview(payload) {
@@ -66,7 +45,7 @@ export default function FreeTastingPage() {
     setStatusMsg("");
 
     // ✅ todos obrigatórios
-    if (!file) return setStatusMsg("Envie o PDF do edital.");
+    if (!urlPdf.trim()) return setStatusMsg("Cole a URL do PDF do edital.");
     if (!editalLink.trim()) return setStatusMsg("Informe o link do leilão.");
     if (!nome.trim()) return setStatusMsg("Informe seu nome.");
     if (!whatsapp.trim()) return setStatusMsg("Informe seu WhatsApp.");
@@ -79,12 +58,9 @@ export default function FreeTastingPage() {
     setLoading(true);
 
     try {
-      setStatusMsg("Enviando PDF…");
-      const url_pdf = await uploadPdfToStorage(file);
-
       setStatusMsg("Gerando prévia…");
       const res = await callCreatePreview({
-        url_pdf,
+        url_pdf: urlPdf.trim(),
         edital_link: editalLink.trim(),
         nome: nome.trim(),
         whatsapp: whats,
@@ -109,20 +85,20 @@ export default function FreeTastingPage() {
           <h1 className="text-2xl font-bold">Degustação Gratuita</h1>
 
           <p className="mt-2 text-white/70">
-            Envie o <b>PDF do edital</b> + seus dados para gerar uma{" "}
+            Cole a <b>URL do PDF do edital</b> e preencha seus dados para gerar uma{" "}
             <b>prévia automática</b>.
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
               <label className="block text-sm font-semibold text-white/80">
-                PDF do edital <span className="text-[#d4af37]">(obrigatório)</span>
+                URL do PDF do edital <span className="text-[#d4af37]">(obrigatório)</span>
               </label>
               <input
-                type="file"
-                accept="application/pdf"
+                value={urlPdf}
+                onChange={(e) => setUrlPdf(e.target.value)}
+                placeholder="https://.../edital.pdf"
                 required
-                onChange={(e) => setFile(e.target.files?.[0] || null)}
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
             </div>
@@ -134,7 +110,7 @@ export default function FreeTastingPage() {
               <input
                 value={editalLink}
                 onChange={(e) => setEditalLink(e.target.value)}
-                placeholder="Cole o link da página do leilão"
+                placeholder="https://... (página do leilão)"
                 required
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
