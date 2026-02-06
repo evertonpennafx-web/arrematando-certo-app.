@@ -105,8 +105,6 @@ const FreeTastingPage = () => {
         });
 
         // ✅ Mantém seu padrão de chamada com string:
-        // uploadPdfToStorage(file, "free_preview_files")
-        // (a lib precisa aceitar string como bucket; se não aceitar, troque para { bucket: "free_preview_files" })
         const uploaded = await uploadPdfToStorage(formData.file, "free_preview_files");
 
         // ✅ Garante string URL
@@ -124,14 +122,16 @@ const FreeTastingPage = () => {
         description: "Iniciando análise do seu edital.",
       });
 
-      // Submit (salva na base/edge function dependendo da sua implementação)
       console.log("📤 Calling submitFreePreview...");
+
       const response = await submitFreePreview({
         nome: formData.name,
         email: formData.email,
         whatsapp: formData.whatsapp,
         edital_link: editalInfo,
-        pdf_url: pdfUrl,
+
+        // ✅ CORREÇÃO: sua tabela chama url_pdf (não pdf_url)
+        url_pdf: pdfUrl,
       });
 
       console.log("📥 Response received:", response);
@@ -157,12 +157,10 @@ const FreeTastingPage = () => {
       // Determine redirect URL
       let targetUrl;
       if (reportUrl) {
-        // Use report_url if provided by backend
         targetUrl = reportUrl.startsWith("http")
           ? new URL(reportUrl).pathname + new URL(reportUrl).search
           : reportUrl;
       } else {
-        // Manual construction fallback
         targetUrl = `/relatorio?id=${id}&t=${accessToken}`;
       }
 
@@ -274,7 +272,6 @@ const FreeTastingPage = () => {
                   Solicitar Preview
                 </h2>
 
-                {/* Error Display UI */}
                 {submissionError && (
                   <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
                     <div className="flex items-start gap-3">
