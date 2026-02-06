@@ -21,18 +21,14 @@ export default async function handler(req, res) {
     return sendJson(res, 405, { error: "Method not allowed" });
   }
 
+  let safeId = null;
+
   try {
     // ✅ Backend envs (corretas)
     // (fallback pro VITE_ só pra não travar se você setou errado)
-    const SUPABASE_URL =
-      process.env.SUPABASE_URL ||
-      process.env.VITE_SUPABASE_URL ||
-      "";
-
+    const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
     const SUPABASE_SERVICE_ROLE_KEY =
-      process.env.SUPABASE_SERVICE_ROLE_KEY ||
-      process.env.SUPABASE_SERVICE_KEY ||
-      "";
+      process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "";
 
     if (!SUPABASE_URL) {
       return sendJson(res, 500, {
@@ -64,6 +60,7 @@ export default async function handler(req, res) {
 
     const { id } = body || {};
     if (!id) return sendJson(res, 400, { error: "Missing required field: id" });
+    safeId = id;
 
     // 1) busca registro
     const { data: row, error: fetchErr } = await supabase
@@ -163,11 +160,53 @@ export default async function handler(req, res) {
       .eq("id", id);
 
     if (updErr) {
-      return sendJson(res, 500, { error: "Falha ao atualizar registro", details: updErr.message });
+      // marca como error antes de responder (pra não deixar processando infinito)
+      await supabase
+        .from("preview_gratuito")
+        .update({
+          status: "error",
+          error_message: String(updErr.message || "Falha ao atualizar registro").slice(0, 900),
+          analyzed_at: new Date().toISOString(),
+        })
+        .eq("id", id);
+
+      return sendJson(res, 200, {
+        ok: false,
+        error: "Falha ao finalizar a análise. Tente novamente.",
+        details: updErr.message,
+      });
     }
 
     return sendJson(res, 200, { ok: true, id });
   } catch (err) {
-    return sendJson(res, 500, { error: "Unhandled error", details: String(err?.message || err) });
+    const message = String(err?.message || err || "unknown error");
+
+    // tenta marcar no banco (sem quebrar retorno mesmo se falhar)
+    try {
+      const SUPABASE_URL = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || "";
+      const SUPABASE_SERVICE_ROLE_KEY =
+        process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || "";
+
+      if (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY && safeId) {
+        const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+          auth: { persistSession: false },
+        });
+
+        await supabase
+          .from("preview_gratuito")
+          .update({
+            status: "error",
+            error_message: message.slice(0, 900),
+            analyzed_at: new Date().toISOString(),
+          })
+          .eq("id", safeId);
+      }
+    } catch (_) {}
+
+    return sendJson(res, 200, {
+      ok: false,
+      error: "Falha ao analisar. Tente novamente.",
+      details: message,
+    });
   }
 }
