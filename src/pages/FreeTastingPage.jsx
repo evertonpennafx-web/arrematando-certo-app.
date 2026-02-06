@@ -14,89 +14,85 @@ export default function FreeTastingPage() {
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
 
-  // ⚠️ Troque se o nome do seu bucket for outro
-  const BUCKET = "edital-pdfs";
+  const BUCKET = "edital-pdfs"; // troque se seu bucket tiver outro nome
 
-  function normalizeWhatsApp(v) {
-    // mantém só dígitos
-    const digits = String(v || "").replace(/\D/g, "");
-    return digits;
+  function digitsOnly(v) {
+    return String(v || "").replace(/\D/g, "");
   }
 
   async function uploadPdfToStorage(pdfFile) {
-    const ext = (pdfFile.name.split(".").pop() || "pdf").toLowerCase();
-    const safeExt = ext === "pdf" ? "pdf" : "pdf";
-    const path = `previews/${Date.now()}-${Math.random().toString(16).slice(2)}.${safeExt}`;
+    const path = `previews/${Date.now()}-${Math.random().toString(16).slice(2)}.pdf`;
 
     const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, pdfFile, {
       contentType: "application/pdf",
       upsert: false,
     });
 
-    if (upErr) {
-      throw new Error(`Falha ao enviar PDF: ${upErr.message}`);
-    }
+    if (upErr) throw new Error(`Falha ao enviar PDF: ${upErr.message}`);
 
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-    const publicUrl = data?.publicUrl;
+    if (!data?.publicUrl) throw new Error("Não foi possível obter URL pública do PDF.");
 
-    if (!publicUrl) {
-      throw new Error("Não foi possível obter URL pública do PDF.");
+    return data.publicUrl;
+  }
+
+  async function callCreatePreview(payload) {
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+    const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+    if (!SUPABASE_URL || !ANON) {
+      throw new Error("Env faltando: VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY");
     }
 
-    return publicUrl;
+    const resp = await fetch(`${SUPABASE_URL}/functions/v1/create_preview`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: ANON,
+        authorization: `Bearer ${ANON}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data?.ok) {
+      throw new Error(data?.error || "Falha ao criar prévia.");
+    }
+    return data;
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
     setStatusMsg("");
 
-    // ✅ Validação: todos obrigatórios
+    // ✅ todos obrigatórios
     if (!file) return setStatusMsg("Envie o PDF do edital.");
     if (!editalLink.trim()) return setStatusMsg("Informe o link do leilão.");
     if (!nome.trim()) return setStatusMsg("Informe seu nome.");
     if (!whatsapp.trim()) return setStatusMsg("Informe seu WhatsApp.");
     if (!email.trim()) return setStatusMsg("Informe seu email.");
 
-    const whats = normalizeWhatsApp(whatsapp);
+    const whats = digitsOnly(whatsapp);
     if (whats.length < 10) return setStatusMsg("WhatsApp inválido. Ex: (11) 99999-9999.");
-
-    // email básico (HTML já valida, mas reforça)
     if (!email.includes("@") || email.length < 6) return setStatusMsg("Email inválido.");
 
     setLoading(true);
 
     try {
-      // 1) upload do PDF
       setStatusMsg("Enviando PDF…");
       const url_pdf = await uploadPdfToStorage(file);
 
-      // 2) chama endpoint do Vercel (server-side) para criar preview
-      // ⚠️ Se seu endpoint tiver outro caminho, troque aqui
       setStatusMsg("Gerando prévia…");
-
-      const resp = await fetch("/api/create-preview", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url_pdf,
-          edital_link: editalLink.trim(),
-          nome: nome.trim(),
-          whatsapp: whats,
-          email: email.trim(),
-        }),
+      const res = await callCreatePreview({
+        url_pdf,
+        edital_link: editalLink.trim(),
+        nome: nome.trim(),
+        whatsapp: whats,
+        email: email.trim(),
       });
 
-      const payload = await resp.json().catch(() => ({}));
-
-      if (!resp.ok || !payload?.ok) {
-        throw new Error(payload?.error || "Falha ao criar prévia.");
-      }
-
-      // 3) redireciona para relatório
       const reportUrl =
-        payload?.report_url ||
-        `/relatorio?id=${payload.id}&t=${payload.access_token || payload.token}`;
+        res?.report_url || `/relatorio?id=${res.id}&t=${res.access_token || res.token}`;
 
       window.location.href = reportUrl;
     } catch (err) {
@@ -118,7 +114,6 @@ export default function FreeTastingPage() {
           </p>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            {/* PDF obrigatório */}
             <div>
               <label className="block text-sm font-semibold text-white/80">
                 PDF do edital <span className="text-[#d4af37]">(obrigatório)</span>
@@ -130,10 +125,8 @@ export default function FreeTastingPage() {
                 onChange={(e) => setFile(e.target.files?.[0] || null)}
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
-              <div className="mt-2 text-xs text-white/50">Formato: PDF.</div>
             </div>
 
-            {/* Link do leilão obrigatório */}
             <div>
               <label className="block text-sm font-semibold text-white/80">
                 Link do leilão <span className="text-[#d4af37]">(obrigatório)</span>
@@ -147,7 +140,6 @@ export default function FreeTastingPage() {
               />
             </div>
 
-            {/* Nome obrigatório */}
             <div>
               <label className="block text-sm font-semibold text-white/80">
                 Nome <span className="text-[#d4af37]">(obrigatório)</span>
@@ -161,7 +153,6 @@ export default function FreeTastingPage() {
               />
             </div>
 
-            {/* WhatsApp obrigatório */}
             <div>
               <label className="block text-sm font-semibold text-white/80">
                 WhatsApp <span className="text-[#d4af37]">(obrigatório)</span>
@@ -173,12 +164,8 @@ export default function FreeTastingPage() {
                 required
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
-              <div className="mt-2 text-xs text-white/50">
-                Dica: pode digitar com ou sem parênteses. A gente normaliza.
-              </div>
             </div>
 
-            {/* Email obrigatório */}
             <div>
               <label className="block text-sm font-semibold text-white/80">
                 Email <span className="text-[#d4af37]">(obrigatório)</span>
