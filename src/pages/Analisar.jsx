@@ -1,148 +1,143 @@
 import { createClient } from "@supabase/supabase-js";
 
-function send(res, status, payload) {
+function json(res, status, data) {
   res.statusCode = status;
   res.setHeader("Content-Type", "application/json; charset=utf-8");
-  res.end(JSON.stringify(payload));
-}
-
-const nowIso = () => new Date().toISOString();
-
-function buildMockReportHtml({ nome = "Cliente", pdfUrl = "" }) {
-  return `
-  <div style="font-family: Arial, sans-serif; line-height: 1.6; padding: 8px;">
-    <h1 style="margin:0 0 8px 0;">Relatório de Análise (Preview)</h1>
-    <p style="margin:0 0 16px 0; color:#444;">
-      Olá <b>${nome}</b>. Seu documento foi recebido e processado.
-    </p>
-
-    <h2 style="margin:16px 0 8px 0;">Resumo</h2>
-    <ul>
-      <li><b>Status:</b> OK (pipeline validado)</li>
-      <li><b>Modelo:</b> Mock (próximo passo: IA real)</li>
-      <li><b>Ação:</b> Você pode avançar para versão paga com análise completa</li>
-    </ul>
-
-    <h2 style="margin:16px 0 8px 0;">Arquivo</h2>
-    <p><a href="${pdfUrl}" target="_blank" rel="noreferrer">Abrir PDF enviado</a></p>
-
-    <hr style="margin:24px 0;" />
-    <p style="font-size:12px; color:#777;">Gerado em ${new Date().toLocaleString("pt-BR")}</p>
-  </div>
-  `;
+  res.end(JSON.stringify(data));
 }
 
 export default async function handler(req, res) {
-  // 🔥 Log básico por request
-  console.log("[/api/analisar] start", req.method);
+  // CORS básico
+  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Methods", "POST, OPTIONS");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") return res.status(204).end();
+  if (req.method !== "POST") return json(res, 405, { error: "Method not allowed" });
 
   try {
-    if (req.method !== "POST") {
-      return send(res, 405, { error: "Method not allowed" });
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    if (!SUPABASE_URL) {
+      return json(res, 500, { error: "Missing env: SUPABASE_URL" });
+    }
+    if (!SUPABASE_SERVICE_ROLE_KEY) {
+      return json(res, 500, { error: "Missing env: SUPABASE_SERVICE_ROLE_KEY" });
     }
 
-    const { id } = req.body || {};
-    if (!id) return send(res, 400, { error: "Missing 'id' in body" });
-
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!supabaseUrl) {
-      console.error("ENV missing: SUPABASE_URL");
-      return send(res, 500, { error: "Server misconfigured: SUPABASE_URL missing" });
-    }
-    if (!serviceRoleKey) {
-      console.error("ENV missing: SUPABASE_SERVICE_ROLE_KEY");
-      return send(res, 500, { error: "Server misconfigured: SUPABASE_SERVICE_ROLE_KEY missing" });
-    }
-
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: { persistSession: false },
     });
 
-    // 1) Busca registro
+    // parse body
+    let body = req.body;
+    if (typeof body === "string") {
+      body = JSON.parse(body);
+    }
+
+    const { id } = body || {};
+    if (!id) return json(res, 400, { error: "Missing required field: id" });
+
+    // 1) busca registro
     const { data: row, error: fetchErr } = await supabase
       .from("preview_gratuito")
-      .select("id, nome, url_pdf, edital_link, status")
+      .select("id, status, edital_link, url_pdf, access_token")
       .eq("id", id)
       .single();
 
     if (fetchErr || !row) {
-      console.error("Fetch error:", fetchErr);
-      return send(res, 404, { error: "Registro não encontrado", details: fetchErr?.message });
+      return json(res, 404, { error: "Registro não encontrado", details: fetchErr?.message });
     }
 
-    console.log("[/api/analisar] found row", { id: row.id, status: row.status });
-
-    // Se já está done, não reprocessa
-    if (row.status === "done") {
-      console.log("[/api/analisar] already done");
-      return send(res, 200, { ok: true, id, status: "done" });
-    }
-
-    // 2) Marca como processing
+    // 2) marca como processing (opcional mas bom)
     await supabase
       .from("preview_gratuito")
-      .update({ status: "processing", updated_at: nowIso(), error_message: null })
+      .update({ status: "processing", error_message: null })
       .eq("id", id);
 
-    const pdfUrl = row.url_pdf || "";
-    const editalLink = row.edital_link || "";
+    // 3) GERA RELATÓRIO (mock por enquanto — só pra “ligar o fio”)
+    const fonte = row.edital_link || row.url_pdf || "(sem fonte)";
+    const now = new Date().toISOString();
 
-    if (!pdfUrl && !editalLink) {
-      await supabase
-        .from("preview_gratuito")
-        .update({
-          status: "error",
-          error_message: "Nenhum PDF (url_pdf) ou link (edital_link) informado.",
-          updated_at: nowIso(),
-        })
-        .eq("id", id);
-
-      return send(res, 400, { error: "Registro sem PDF/link" });
-    }
-
-    // 3) (Mock) gera relatório
-    const reportHtml = buildMockReportHtml({ nome: row.nome, pdfUrl });
-    const resultJson = {
-      mode: "mock",
-      source: pdfUrl ? "pdf" : "link",
-      pdfUrl,
-      editalLink,
-      generated_at: nowIso(),
+    const result_json = {
+      ok: true,
+      fonte,
+      gerado_em: now,
+      resumo: {
+        pontos_de_atencao: [
+          "Verifique prazos e datas do edital.",
+          "Confirme condições de pagamento e comissão do leiloeiro.",
+          "Cheque débitos/ônus e possibilidade de desocupação.",
+        ],
+        recomendacao: "Análise preliminar automática. Recomenda-se revisão completa antes de arrematar.",
+      },
     };
 
-    // 4) Salva done
+    const report_html = `
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Relatório - Arrematando Certo</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial; background:#0b0b0b; color:#fff; margin:0; padding:24px;}
+    .card{max-width:920px; margin:0 auto; background:#111; border:1px solid #222; border-radius:16px; padding:20px;}
+    h1{margin:0 0 6px 0; font-size:24px;}
+    .muted{color:#aaa; margin:0 0 16px 0;}
+    .box{background:#0f0f0f; border:1px solid #222; border-radius:14px; padding:14px; margin-top:14px;}
+    ul{margin:8px 0 0 18px;}
+    a{color:#d4af37;}
+    .badge{display:inline-block; padding:6px 10px; border-radius:999px; background:#1a1a1a; border:1px solid #2a2a2a; color:#d4af37; font-weight:700; font-size:12px;}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="badge">PRÉVIA AUTOMÁTICA</div>
+    <h1>Relatório de Análise</h1>
+    <p class="muted">Gerado em ${now}</p>
+
+    <div class="box">
+      <b>Fonte:</b>
+      <div style="margin-top:6px;">${fonte}</div>
+    </div>
+
+    <div class="box">
+      <b>Pontos de atenção</b>
+      <ul>
+        <li>Verifique prazos e datas do edital</li>
+        <li>Condições de pagamento e comissão do leiloeiro</li>
+        <li>Débitos/ônus e desocupação</li>
+      </ul>
+    </div>
+
+    <div class="box">
+      <b>Recomendação</b>
+      <div style="margin-top:8px;">Análise preliminar automática. Recomenda-se revisão completa antes de arrematar.</div>
+    </div>
+  </div>
+</body>
+</html>`.trim();
+
+    // 4) atualiza como done
     const { error: updErr } = await supabase
       .from("preview_gratuito")
       .update({
         status: "done",
-        report_html: reportHtml,
-        result_json: resultJson,
-        analyzed_at: nowIso(),
-        updated_at: nowIso(),
+        result_json,
+        report_html,
+        analyzed_at: new Date().toISOString(),
         error_message: null,
       })
       .eq("id", id);
 
     if (updErr) {
-      console.error("Update error:", updErr);
-      await supabase
-        .from("preview_gratuito")
-        .update({
-          status: "error",
-          error_message: `Falha ao salvar relatório: ${updErr.message}`,
-          updated_at: nowIso(),
-        })
-        .eq("id", id);
-
-      return send(res, 500, { error: "Falha ao salvar relatório", details: updErr.message });
+      return json(res, 500, { error: "Falha ao atualizar registro", details: updErr.message });
     }
 
-    console.log("[/api/analisar] done", id);
-    return send(res, 200, { ok: true, id, status: "done" });
+    return json(res, 200, { ok: true, id });
   } catch (err) {
-    console.error("[/api/analisar] unhandled", err);
-    return send(res, 500, { error: "Erro interno", details: String(err?.message || err) });
+    return json(res, 500, { error: "Unhandled error", details: String(err?.message || err) });
   }
 }
