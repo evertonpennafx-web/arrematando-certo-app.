@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import Layout from "@/components/Layout";
+import { supabase } from "@/lib/supabase";
 
 export default function FreeTastingPage() {
   const [urlPdf, setUrlPdf] = useState("");
@@ -20,18 +21,22 @@ export default function FreeTastingPage() {
     return s.includes(".pdf");
   }
 
+  // ✅ VOLTA AO FLUXO ANTIGO: Supabase Edge Function direto (sem /api)
   async function callCreatePreview(payload) {
-    // ✅ chama sua Vercel API (mesmo domínio) -> sem CORS
-    const resp = await fetch("/api/create_preview", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+    const { data, error } = await supabase.functions.invoke("create_preview", {
+      body: payload,
     });
 
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok || !data?.ok) {
+    if (error) {
+      // supabase-js error geralmente tem message/context
+      throw new Error(error.message || "Falha ao criar prévia.");
+    }
+
+    if (!data?.ok) {
+      // sua edge function parece retornar { ok: false, error, details }
       throw new Error(data?.error || "Falha ao criar prévia.");
     }
+
     return data;
   }
 
@@ -59,16 +64,17 @@ export default function FreeTastingPage() {
     try {
       setStatusMsg("Gerando prévia…");
 
+      // ✅ IMPORTANTE: campos com nomes que sua edge function espera (pdf_url, leilao_url...)
       const res = await callCreatePreview({
-        url_pdf: urlPdf.trim(),
-        edital_link: editalLink.trim(),
+        pdf_url: urlPdf.trim(),
+        leilao_url: editalLink.trim(),
         nome: nome.trim(),
         whatsapp: whats,
         email: email.trim(),
       });
 
       const reportUrl =
-        res?.report_url || `/relatorio?id=${res.id}&t=${res.access_token || res.token}`;
+        res?.report_url || `/relatorio?id=${encodeURIComponent(res.id)}&t=${encodeURIComponent(res.access_token || res.token)}`;
 
       window.location.href = reportUrl;
     } catch (err) {
