@@ -1,67 +1,106 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Layout from "@/components/Layout";
-import { assertSupabase } from "@/lib/supabase";
+import customSupabaseClient from "@/lib/customSupabaseClient";
 
 export default function FreeTastingPage() {
-  const [urlPdf, setUrlPdf] = useState("");
+  const supabase = useMemo(() => customSupabaseClient, []);
+  const [file, setFile] = useState(null);
+
   const [editalLink, setEditalLink] = useState("");
   const [nome, setNome] = useState("");
-  const [email, setEmail] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
+  const [email, setEmail] = useState("");
+
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [okLink, setOkLink] = useState("");
+  const [statusMsg, setStatusMsg] = useState("");
 
-  async function onSubmit(e) {
-    e.preventDefault();
-    setError("");
-    setOkLink("");
+  // ⚠️ Troque se o nome do seu bucket for outro
+  const BUCKET = "edital-pdfs";
 
-    if (!urlPdf.trim()) {
-      setError("Cole a URL do PDF para continuar.");
-      return;
+  function normalizeWhatsApp(v) {
+    // mantém só dígitos
+    const digits = String(v || "").replace(/\D/g, "");
+    return digits;
+  }
+
+  async function uploadPdfToStorage(pdfFile) {
+    const ext = (pdfFile.name.split(".").pop() || "pdf").toLowerCase();
+    const safeExt = ext === "pdf" ? "pdf" : "pdf";
+    const path = `previews/${Date.now()}-${Math.random().toString(16).slice(2)}.${safeExt}`;
+
+    const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, pdfFile, {
+      contentType: "application/pdf",
+      upsert: false,
+    });
+
+    if (upErr) {
+      throw new Error(`Falha ao enviar PDF: ${upErr.message}`);
     }
+
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+    const publicUrl = data?.publicUrl;
+
+    if (!publicUrl) {
+      throw new Error("Não foi possível obter URL pública do PDF.");
+    }
+
+    return publicUrl;
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setStatusMsg("");
+
+    // ✅ Validação: todos obrigatórios
+    if (!file) return setStatusMsg("Envie o PDF do edital.");
+    if (!editalLink.trim()) return setStatusMsg("Informe o link do leilão.");
+    if (!nome.trim()) return setStatusMsg("Informe seu nome.");
+    if (!whatsapp.trim()) return setStatusMsg("Informe seu WhatsApp.");
+    if (!email.trim()) return setStatusMsg("Informe seu email.");
+
+    const whats = normalizeWhatsApp(whatsapp);
+    if (whats.length < 10) return setStatusMsg("WhatsApp inválido. Ex: (11) 99999-9999.");
+
+    // email básico (HTML já valida, mas reforça)
+    if (!email.includes("@") || email.length < 6) return setStatusMsg("Email inválido.");
 
     setLoading(true);
 
     try {
-      // garante envs
-      assertSupabase();
+      // 1) upload do PDF
+      setStatusMsg("Enviando PDF…");
+      const url_pdf = await uploadPdfToStorage(file);
 
-      const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-      const ANON = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      // 2) chama endpoint do Vercel (server-side) para criar preview
+      // ⚠️ Se seu endpoint tiver outro caminho, troque aqui
+      setStatusMsg("Gerando prévia…");
 
-      const resp = await fetch(`${SUPABASE_URL}/functions/v1/create_preview`, {
+      const resp = await fetch("/api/create-preview", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: ANON,
-          authorization: `Bearer ${ANON}`,
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          url_pdf: urlPdf.trim(),
-          edital_link: editalLink.trim() || null,
-          nome: nome.trim() || null,
-          email: email.trim() || null,
-          whatsapp: whatsapp.trim() || null,
+          url_pdf,
+          edital_link: editalLink.trim(),
+          nome: nome.trim(),
+          whatsapp: whats,
+          email: email.trim(),
         }),
       });
 
-      const payload = await resp.json().catch(() => null);
+      const payload = await resp.json().catch(() => ({}));
 
       if (!resp.ok || !payload?.ok) {
-        throw new Error(payload?.error || `Falha (HTTP ${resp.status})`);
+        throw new Error(payload?.error || "Falha ao criar prévia.");
       }
 
-      // report_url vem tipo "/relatorio?id=...&t=..."
-      const reportUrl = payload.report_url || "";
-      if (!reportUrl) throw new Error("Relatório não retornado.");
+      // 3) redireciona para relatório
+      const reportUrl =
+        payload?.report_url ||
+        `/relatorio?id=${payload.id}&t=${payload.access_token || payload.token}`;
 
-      setOkLink(reportUrl);
-      // já redireciona
       window.location.href = reportUrl;
-    } catch (e2) {
-      setError(String(e2?.message || "Erro ao criar preview."));
+    } catch (err) {
+      setStatusMsg(String(err?.message || err));
     } finally {
       setLoading(false);
     }
@@ -69,80 +108,104 @@ export default function FreeTastingPage() {
 
   return (
     <Layout>
-      <div style={{ minHeight: "70vh", display: "flex", justifyContent: "center", padding: "48px 16px" }}>
-        <div style={{ width: "100%", maxWidth: 820, background: "#111", border: "1px solid #222", borderRadius: 16, padding: 20 }}>
-          <h1 style={{ margin: 0, color: "#fff" }}>Degustação Gratuita</h1>
-          <p style={{ color: "#aaa", marginTop: 8 }}>
-            Cole a <b>URL do PDF</b> do edital e gere uma prévia automática.
+      <div className="mx-auto max-w-3xl px-4 py-10">
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
+          <h1 className="text-2xl font-bold">Degustação Gratuita</h1>
+
+          <p className="mt-2 text-white/70">
+            Envie o <b>PDF do edital</b> + seus dados para gerar uma{" "}
+            <b>prévia automática</b>.
           </p>
 
-          <form onSubmit={onSubmit} style={{ marginTop: 14, display: "grid", gap: 12 }}>
-            <input
-              value={urlPdf}
-              onChange={(e) => setUrlPdf(e.target.value)}
-              placeholder="URL do PDF (obrigatório)"
-              style={{ padding: 12, borderRadius: 12, border: "1px solid #222", background: "#0f0f0f", color: "#fff" }}
-            />
-            <input
-              value={editalLink}
-              onChange={(e) => setEditalLink(e.target.value)}
-              placeholder="Link do leilão (opcional)"
-              style={{ padding: 12, borderRadius: 12, border: "1px solid #222", background: "#0f0f0f", color: "#fff" }}
-            />
-
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            {/* PDF obrigatório */}
+            <div>
+              <label className="block text-sm font-semibold text-white/80">
+                PDF do edital <span className="text-[#d4af37]">(obrigatório)</span>
+              </label>
               <input
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                placeholder="Nome (opcional)"
-                style={{ padding: 12, borderRadius: 12, border: "1px solid #222", background: "#0f0f0f", color: "#fff" }}
+                type="file"
+                accept="application/pdf"
+                required
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
+              <div className="mt-2 text-xs text-white/50">Formato: PDF.</div>
+            </div>
+
+            {/* Link do leilão obrigatório */}
+            <div>
+              <label className="block text-sm font-semibold text-white/80">
+                Link do leilão <span className="text-[#d4af37]">(obrigatório)</span>
+              </label>
               <input
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
-                placeholder="WhatsApp (opcional)"
-                style={{ padding: 12, borderRadius: 12, border: "1px solid #222", background: "#0f0f0f", color: "#fff" }}
+                value={editalLink}
+                onChange={(e) => setEditalLink(e.target.value)}
+                placeholder="Cole o link da página do leilão"
+                required
+                className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
             </div>
 
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email (opcional)"
-              style={{ padding: 12, borderRadius: 12, border: "1px solid #222", background: "#0f0f0f", color: "#fff" }}
-            />
+            {/* Nome obrigatório */}
+            <div>
+              <label className="block text-sm font-semibold text-white/80">
+                Nome <span className="text-[#d4af37]">(obrigatório)</span>
+              </label>
+              <input
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                placeholder="Seu nome"
+                required
+                className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
+              />
+            </div>
 
-            {error && (
-              <div style={{ padding: 12, borderRadius: 12, border: "1px solid #333", background: "#0f0f0f", color: "#ffb4b4" }}>
-                {error}
+            {/* WhatsApp obrigatório */}
+            <div>
+              <label className="block text-sm font-semibold text-white/80">
+                WhatsApp <span className="text-[#d4af37]">(obrigatório)</span>
+              </label>
+              <input
+                value={whatsapp}
+                onChange={(e) => setWhatsapp(e.target.value)}
+                placeholder="(11) 99999-9999"
+                required
+                className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
+              />
+              <div className="mt-2 text-xs text-white/50">
+                Dica: pode digitar com ou sem parênteses. A gente normaliza.
               </div>
-            )}
+            </div>
+
+            {/* Email obrigatório */}
+            <div>
+              <label className="block text-sm font-semibold text-white/80">
+                Email <span className="text-[#d4af37]">(obrigatório)</span>
+              </label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu@email.com"
+                required
+                className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
+              />
+            </div>
 
             <button
               type="submit"
               disabled={loading}
-              style={{
-                padding: 12,
-                borderRadius: 12,
-                border: 0,
-                fontWeight: 900,
-                cursor: loading ? "not-allowed" : "pointer",
-                background: "#d4af37",
-                color: "#111",
-              }}
+              className="w-full rounded-xl bg-[#d4af37] px-6 py-4 text-center font-extrabold text-black disabled:opacity-60"
             >
               {loading ? "Gerando…" : "Gerar Relatório"}
             </button>
 
-            {okLink && (
-              <a href={okLink} style={{ color: "#d4af37", fontWeight: 900 }}>
-                Abrir relatório
-              </a>
-            )}
+            {statusMsg ? <div className="text-sm text-white/70">{statusMsg}</div> : null}
 
-            <p style={{ color: "#777", marginTop: 8, fontSize: 13 }}>
+            <div className="text-xs text-white/50">
               * Prévia automática. Não substitui análise jurídica.
-            </p>
+            </div>
           </form>
         </div>
       </div>
