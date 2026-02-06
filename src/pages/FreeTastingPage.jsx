@@ -28,9 +28,11 @@ export default function FreeTastingPage() {
     });
 
     const data = await resp.json().catch(() => ({}));
+
     if (!resp.ok || !data?.ok) {
       throw new Error(data?.error || "Falha ao criar prévia.");
     }
+
     return data;
   }
 
@@ -61,7 +63,7 @@ export default function FreeTastingPage() {
       const pdf = urlPdf.trim();
       const leilao = editalLink.trim();
 
-      // ✅ manda ambos formatos (compatível com qualquer function)
+      // ✅ manda payload compatível (antigo + novo)
       const res = await callCreatePreview({
         url_pdf: pdf,
         edital_link: leilao,
@@ -72,8 +74,15 @@ export default function FreeTastingPage() {
         email: email.trim(),
       });
 
-      const reportUrl =
-        res?.report_url || `/relatorio?id=${encodeURIComponent(res.id)}&t=${encodeURIComponent(res.access_token || res.token)}`;
+      const id = res?.id;
+      const token = res?.access_token || res?.token || res?.t;
+
+      const reportUrl = res?.report_url || (id && token ? `/relatorio?id=${encodeURIComponent(id)}&t=${encodeURIComponent(token)}` : null);
+
+      if (!reportUrl) {
+        setStatusMsg("Prévia criada, mas não consegui abrir o relatório automaticamente.");
+        return;
+      }
 
       window.location.href = reportUrl;
     } catch (err) {
