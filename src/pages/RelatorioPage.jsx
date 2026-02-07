@@ -37,8 +37,9 @@ export default function RelatorioPage() {
 
   const canLoad = Boolean(id && token);
 
-  const WhatsAppLink =
-    "https://wa.me/5511999999999?text=" + // <-- TROQUE AQUI (se quiser manter suporte)
+    const WhatsAppLink =
+  "https://wa.me/5511932087649?text=" +
+
     encodeURIComponent(`Oi! Meu relatório demorou/travou. Meu ID é: ${id}`);
 
   function stopPolling() {
