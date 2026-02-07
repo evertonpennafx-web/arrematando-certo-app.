@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 
 const KIWIFY_CHECKOUT = "https://pay.kiwify.com.br/UqeERMG";
 const PAID_KEY = "ac_paid_1990";
+const LAST_REPORT_KEY = "ac_last_report_url";
 
 function useQuery() {
   return useMemo(() => new URLSearchParams(window.location.search), []);
@@ -70,13 +71,27 @@ export default function RelatorioPage() {
     };
   }
 
-  // ✅ captura paid=true e seta localStorage
+  // ✅ 1) Captura paid=true
+  // ✅ 2) Marca pagamento no localStorage
+  // ✅ 3) Se estiver sem id&t, redireciona automaticamente pro último relatório salvo
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
+
     if (params.get("paid") === "true") {
       localStorage.setItem(PAID_KEY, "true");
+
+      // Se chegou aqui sem id&t (redirect da Kiwify), volta pro último relatório salvo
+      if (!id || !token) {
+        const lastReport = localStorage.getItem(LAST_REPORT_KEY);
+        if (lastReport) {
+          window.location.replace(lastReport);
+          return;
+        }
+      }
     }
+
     setIsPaid(localStorage.getItem(PAID_KEY) === "true");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function tick() {
@@ -109,7 +124,7 @@ export default function RelatorioPage() {
         const paidNow = localStorage.getItem(PAID_KEY) === "true";
         setIsPaid(paidNow);
 
-        // ✅ sempre injeta base target top pra links do relatório não abrirem dentro do iframe
+        // ✅ garante que links do relatório não abram dentro do iframe
         const htmlWithTargetTop = injectBaseTargetTop(html);
 
         // ✅ aplica paywall se não estiver pago
@@ -136,6 +151,7 @@ export default function RelatorioPage() {
   useEffect(() => {
     startedAtRef.current = Date.now();
 
+    // ✅ se não tem id&t, mostra erro amigável (mas o redirect automático já tenta resolver antes)
     if (!canLoad) {
       setStatus("error");
       setErrorMsg("Link inválido. Verifique se o link contém ?id= e &t=.");
@@ -149,6 +165,12 @@ export default function RelatorioPage() {
     return () => stopPolling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, token]);
+
+  function handleGoToCheckout() {
+    // salva o relatório atual para voltar após o pagamento
+    localStorage.setItem(LAST_REPORT_KEY, window.location.href);
+    window.open(`${KIWIFY_CHECKOUT}?utm_source=relatorio`, "_blank", "noopener,noreferrer");
+  }
 
   return (
     <Layout>
@@ -224,6 +246,15 @@ export default function RelatorioPage() {
                     >
                       Falar no WhatsApp
                     </a>
+
+                    {!isPaid && canLoad && (
+                      <button
+                        onClick={handleGoToCheckout}
+                        style={{ background: "#d4af37", color: "#111", border: 0, borderRadius: 10, padding: "10px 14px", fontWeight: 900, cursor: "pointer" }}
+                      >
+                        🔒 Desbloquear por R$19,90
+                      </button>
+                    )}
                   </div>
 
                   {timedOut && <div style={{ marginTop: 10, color: "#aaa" }}>Dica: PDFs muito pesados ou com imagem podem demorar mais.</div>}
@@ -245,11 +276,9 @@ export default function RelatorioPage() {
               {!isPaid && (
                 <div style={{ marginTop: 14, color: "#aaa" }}>
                   🔒 Para ver os riscos jurídicos detalhados, dívidas e o parecer final:
-                  <div style={{ marginTop: 10 }}>
-                    <a
-                      href={`${KIWIFY_CHECKOUT}?utm_source=relatorio`}
-                      target="_blank"
-                      rel="noreferrer"
+                  <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <button
+                      onClick={handleGoToCheckout}
                       style={{
                         display: "inline-block",
                         background: "#d4af37",
@@ -257,11 +286,12 @@ export default function RelatorioPage() {
                         borderRadius: 10,
                         padding: "10px 14px",
                         fontWeight: 900,
-                        textDecoration: "none",
+                        border: 0,
+                        cursor: "pointer",
                       }}
                     >
                       🔒 Desbloquear por R$19,90
-                    </a>
+                    </button>
                   </div>
                 </div>
               )}
@@ -277,7 +307,6 @@ export default function RelatorioPage() {
 
 /**
  * Aplica paywall cortando o HTML a partir da primeira seção "paga".
- * Mantém o começo (resumo, pontos críticos, checklist etc.) e injeta o bloco de compra.
  */
 function applyPaywall(html) {
   if (!html) return html;
@@ -342,7 +371,7 @@ function applyPaywall(html) {
        🔒 Desbloquear por R$19,90
     </a>
     <div style="margin-top:10px; color:#777; font-size:12px;">
-      Após pagar, volte para este link com <b>?paid=true</b> para liberar.
+      Após pagar, você volta automaticamente para o seu relatório e o conteúdo libera.
     </div>
   </div>
   `;
@@ -351,25 +380,20 @@ function applyPaywall(html) {
 }
 
 /**
- * Força qualquer link dentro do srcDoc (iframe) a abrir fora do iframe.
- * Isso evita o bug do checkout abrir dentro do iframe e quebrar.
+ * Força qualquer link do srcDoc (iframe) a abrir fora do iframe.
  */
 function injectBaseTargetTop(html) {
   if (!html) return html;
 
-  // Se já tiver <base>, não duplica
   if (/<base\s/i.test(html)) return html;
 
-  // Se tiver <head>, injeta lá
   if (/<head[^>]*>/i.test(html)) {
     return html.replace(/<head[^>]*>/i, (m) => `${m}\n<base target="_top" />\n`);
   }
 
-  // Se tiver <html>, cria um head básico
   if (/<html[^>]*>/i.test(html)) {
     return html.replace(/<html[^>]*>/i, (m) => `${m}\n<head><base target="_top" /></head>\n`);
   }
 
-  // Se vier sem estrutura, embrulha
   return `<!doctype html><html><head><base target="_top" /></head><body>${html}</body></html>`;
 }
