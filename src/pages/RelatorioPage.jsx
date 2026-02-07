@@ -30,9 +30,9 @@ export default function RelatorioPage() {
   const intervalRef = useRef(null);
 
   const STOP_AFTER_MS = 300000; // 5min
-  const SLOW_WARN_MS = 90000; // 90s
-  const LONG_WARN_MS = 180000; // 3min
-  const POLL_EVERY_MS = 2500; // 2.5s
+  const SLOW_WARN_MS = 90000;   // 90s
+  const LONG_WARN_MS = 180000;  // 3min
+  const POLL_EVERY_MS = 2500;   // 2.5s
 
   const canLoad = Boolean(id && token);
 
@@ -106,10 +106,14 @@ export default function RelatorioPage() {
         const html = row.report_html || "";
         setReportHtml(html);
 
-        // ✅ aplica paywall se não estiver pago
         const paidNow = localStorage.getItem(PAID_KEY) === "true";
         setIsPaid(paidNow);
-        setDisplayHtml(paidNow ? html : applyPaywall(html));
+
+        // ✅ sempre injeta base target top pra links do relatório não abrirem dentro do iframe
+        const htmlWithTargetTop = injectBaseTargetTop(html);
+
+        // ✅ aplica paywall se não estiver pago
+        setDisplayHtml(paidNow ? htmlWithTargetTop : applyPaywall(htmlWithTargetTop));
 
         return;
       }
@@ -150,18 +154,7 @@ export default function RelatorioPage() {
     <Layout>
       <div style={{ minHeight: "70vh", display: "flex", justifyContent: "center", padding: "48px 16px" }}>
         <div style={{ width: "100%", maxWidth: 980, background: "#111", border: "1px solid #222", borderRadius: 16, padding: 20 }}>
-          <div
-            style={{
-              display: "inline-block",
-              padding: "6px 10px",
-              borderRadius: 999,
-              background: "#1a1a1a",
-              border: "1px solid #2a2a2a",
-              color: "#d4af37",
-              fontWeight: 800,
-              fontSize: 12,
-            }}
-          >
+          <div style={{ display: "inline-block", padding: "6px 10px", borderRadius: 999, background: "#1a1a1a", border: "1px solid #2a2a2a", color: "#d4af37", fontWeight: 800, fontSize: 12 }}>
             PRÉVIA AUTOMÁTICA
           </div>
 
@@ -249,7 +242,6 @@ export default function RelatorioPage() {
                 />
               </div>
 
-              {/* CTA fora do iframe (reforço) */}
               {!isPaid && (
                 <div style={{ marginTop: 14, color: "#aaa" }}>
                   🔒 Para ver os riscos jurídicos detalhados, dívidas e o parecer final:
@@ -274,11 +266,7 @@ export default function RelatorioPage() {
                 </div>
               )}
 
-              {isPaid && (
-                <div style={{ marginTop: 14, color: "#aaa" }}>
-                  ✅ Conteúdo desbloqueado.
-                </div>
-              )}
+              {isPaid && <div style={{ marginTop: 14, color: "#aaa" }}>✅ Conteúdo desbloqueado.</div>}
             </div>
           )}
         </div>
@@ -294,11 +282,9 @@ export default function RelatorioPage() {
 function applyPaywall(html) {
   if (!html) return html;
 
-  // já pago? não altera
   const paid = localStorage.getItem(PAID_KEY) === "true";
-  if (paid) return html;
+  if (paid) return injectBaseTargetTop(html);
 
-  // padrões de headings (ajuste se seus títulos mudarem)
   const patterns = [
     /riscos\s+jur[ií]dicos\s+detalhados/i,
     /riscos\s+principais/i,
@@ -310,7 +296,6 @@ function applyPaywall(html) {
   ];
 
   let cutIndex = -1;
-
   for (const p of patterns) {
     const m = html.match(p);
     if (m && typeof m.index === "number") {
@@ -318,8 +303,7 @@ function applyPaywall(html) {
     }
   }
 
-  // não achou título? não quebra nada
-  if (cutIndex === -1) return html;
+  if (cutIndex === -1) return injectBaseTargetTop(html);
 
   const visible = html.slice(0, cutIndex);
 
@@ -343,6 +327,8 @@ function applyPaywall(html) {
       </ul>
     </div>
     <a href="${KIWIFY_CHECKOUT}?utm_source=relatorio"
+       target="_top"
+       rel="noreferrer"
        style="
          display:inline-block;
          margin-top:14px;
@@ -361,5 +347,29 @@ function applyPaywall(html) {
   </div>
   `;
 
-  return visible + paywall;
+  return injectBaseTargetTop(visible + paywall);
+}
+
+/**
+ * Força qualquer link dentro do srcDoc (iframe) a abrir fora do iframe.
+ * Isso evita o bug do checkout abrir dentro do iframe e quebrar.
+ */
+function injectBaseTargetTop(html) {
+  if (!html) return html;
+
+  // Se já tiver <base>, não duplica
+  if (/<base\s/i.test(html)) return html;
+
+  // Se tiver <head>, injeta lá
+  if (/<head[^>]*>/i.test(html)) {
+    return html.replace(/<head[^>]*>/i, (m) => `${m}\n<base target="_top" />\n`);
+  }
+
+  // Se tiver <html>, cria um head básico
+  if (/<html[^>]*>/i.test(html)) {
+    return html.replace(/<html[^>]*>/i, (m) => `${m}\n<head><base target="_top" /></head>\n`);
+  }
+
+  // Se vier sem estrutura, embrulha
+  return `<!doctype html><html><head><base target="_top" /></head><body>${html}</body></html>`;
 }
