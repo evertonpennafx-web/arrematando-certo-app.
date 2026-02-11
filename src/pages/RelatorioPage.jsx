@@ -3,8 +3,6 @@ import Layout from "@/components/Layout";
 import { supabase } from "@/lib/supabase";
 
 const KIWIFY_CHECKOUT = "https://pay.kiwify.com.br/UqeERMG";
-const PAID_KEY = "ac_paid_1990";
-const LAST_REPORT_KEY = "ac_last_report_url";
 
 function useQuery() {
   return useMemo(() => new URLSearchParams(window.location.search), []);
@@ -15,7 +13,9 @@ export default function RelatorioPage() {
   const id = qs.get("id") || "";
   const token = qs.get("t") || qs.get("token") || "";
 
-  const [status, setStatus] = useState("processing"); // processing | done | error
+  const canLoad = Boolean(id && token);
+
+  const [status, setStatus] = useState<"processing" | "done" | "error">("processing");
   const [errorMsg, setErrorMsg] = useState("");
 
   const [reportHtml, setReportHtml] = useState("");
@@ -28,19 +28,22 @@ export default function RelatorioPage() {
   const [timedOut, setTimedOut] = useState(false);
 
   const startedAtRef = useRef(Date.now());
-  const intervalRef = useRef(null);
+  const intervalRef = useRef<number | null>(null);
 
   const STOP_AFTER_MS = 300000; // 5min
-  const SLOW_WARN_MS = 90000;   // 90s
-  const LONG_WARN_MS = 180000;  // 3min
-  const POLL_EVERY_MS = 2500;   // 2.5s
+  const SLOW_WARN_MS = 90000; // 90s
+  const LONG_WARN_MS = 180000; // 3min
+  const POLL_EVERY_MS = 2500; // 2.5s
 
-  const canLoad = Boolean(id && token);
+  const WhatsAppLink =
+    "https://wa.me/5511932087649?text=" + encodeURIComponent(`Oi! Preciso de suporte no relatório. Meu ID é: ${id}`);
 
-    const WhatsAppLink =
-  "https://wa.me/5511932087649?text=" +
-
-    encodeURIComponent(`Oi! Meu relatório demorou/travou. Meu ID é: ${id}`);
+  // ✅ checkout com tracking s1/s2 (Kiwify aceita s1/s2/s3) :contentReference[oaicite:2]{index=2}
+  const checkoutUrl = useMemo(() => {
+    const base = `${KIWIFY_CHECKOUT}?utm_source=relatorio`;
+    if (!id || !token) return base;
+    return `${base}&s1=${encodeURIComponent(id)}&s2=${encodeURIComponent(token)}`;
+  }, [id, token]);
 
   function stopPolling() {
     if (intervalRef.current) {
@@ -52,7 +55,7 @@ export default function RelatorioPage() {
   async function fetchRowOnce() {
     const { data, error } = await supabase
       .from("preview_gratuito")
-      .select("id,status,report_html,error_message,access_token")
+      .select("id,status,report_html,error_message,access_token,paid_at")
       .eq("id", id)
       .single();
 
@@ -63,37 +66,15 @@ export default function RelatorioPage() {
     }
 
     const stRaw = (data.status || "").toLowerCase().trim();
-    const st = stRaw === "erro" ? "error" : stRaw; // compat
+    const st = stRaw === "erro" ? "error" : stRaw;
 
     return {
-      status: st || "processing",
+      status: (st as any) || "processing",
       report_html: data.report_html || "",
       error_message: data.error_message || "",
+      paid_at: data.paid_at || null,
     };
   }
-
-  // ✅ 1) Captura paid=true
-  // ✅ 2) Marca pagamento no localStorage
-  // ✅ 3) Se estiver sem id&t, redireciona automaticamente pro último relatório salvo
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-
-    if (params.get("paid") === "true") {
-      localStorage.setItem(PAID_KEY, "true");
-
-      // Se chegou aqui sem id&t (redirect da Kiwify), volta pro último relatório salvo
-      if (!id || !token) {
-        const lastReport = localStorage.getItem(LAST_REPORT_KEY);
-        if (lastReport) {
-          window.location.replace(lastReport);
-          return;
-        }
-      }
-    }
-
-    setIsPaid(localStorage.getItem(PAID_KEY) === "true");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   async function tick() {
     if (!canLoad) return;
@@ -114,7 +95,7 @@ export default function RelatorioPage() {
     try {
       const row = await fetchRowOnce();
 
-      if (row.status === "done") {
+      if (row.status === "done" || row.status === "done_fallback") {
         setStatus("done");
         setErrorMsg("");
         stopPolling();
@@ -122,14 +103,9 @@ export default function RelatorioPage() {
         const html = row.report_html || "";
         setReportHtml(html);
 
-        const paidNow = localStorage.getItem(PAID_KEY) === "true";
+        const paidNow = Boolean(row.paid_at);
         setIsPaid(paidNow);
-
-        // ✅ garante que links do relatório não abram dentro do iframe
-        const htmlWithTargetTop = injectBaseTargetTop(html);
-
-        // ✅ aplica paywall se não estiver pago
-        setDisplayHtml(paidNow ? htmlWithTargetTop : applyPaywall(htmlWithTargetTop));
+        setDisplayHtml(paidNow ? html : applyPaywall(html));
 
         return;
       }
@@ -142,7 +118,7 @@ export default function RelatorioPage() {
       }
 
       setStatus("processing");
-    } catch (e) {
+    } catch (e: any) {
       setStatus("error");
       setErrorMsg(String(e?.message || e || "Erro ao carregar relatório."));
       stopPolling();
@@ -152,7 +128,6 @@ export default function RelatorioPage() {
   useEffect(() => {
     startedAtRef.current = Date.now();
 
-    // ✅ se não tem id&t, mostra erro amigável (mas o redirect automático já tenta resolver antes)
     if (!canLoad) {
       setStatus("error");
       setErrorMsg("Link inválido. Verifique se o link contém ?id= e &t=.");
@@ -161,17 +136,11 @@ export default function RelatorioPage() {
 
     tick();
     stopPolling();
-    intervalRef.current = setInterval(tick, POLL_EVERY_MS);
+    intervalRef.current = window.setInterval(tick, POLL_EVERY_MS);
 
     return () => stopPolling();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, token]);
-
-  function handleGoToCheckout() {
-    // salva o relatório atual para voltar após o pagamento
-    localStorage.setItem(LAST_REPORT_KEY, window.location.href);
-    window.open(`${KIWIFY_CHECKOUT}?utm_source=relatorio`, "_blank", "noopener,noreferrer");
-  }
 
   return (
     <Layout>
@@ -191,15 +160,9 @@ export default function RelatorioPage() {
               {status === "processing" && (
                 <>
                   <b style={{ color: "#fff" }}>⏳ Analisando seu edital…</b>
-                  <div style={{ marginTop: 8, color: "#aaa" }}>
-                    Isso pode levar de alguns segundos a alguns minutos dependendo do PDF.
-                  </div>
+                  <div style={{ marginTop: 8, color: "#aaa" }}>Isso pode levar de alguns segundos a alguns minutos dependendo do PDF.</div>
 
-                  {slowWarn && (
-                    <div style={{ marginTop: 12, color: "#d4af37" }}>
-                      ⚠️ Tá demorando um pouco… mas ainda está processando.
-                    </div>
-                  )}
+                  {slowWarn && <div style={{ marginTop: 12, color: "#d4af37" }}>⚠️ Tá demorando um pouco… mas ainda está processando.</div>}
 
                   {longWarn && (
                     <div style={{ marginTop: 12, color: "#aaa" }}>
@@ -217,9 +180,7 @@ export default function RelatorioPage() {
               {status === "error" && (
                 <>
                   <b style={{ color: "#fff" }}>❌ Não consegui concluir a análise.</b>
-                  <div style={{ marginTop: 8, color: "#aaa" }}>
-                    {errorMsg || "Tente novamente em alguns instantes."}
-                  </div>
+                  <div style={{ marginTop: 8, color: "#aaa" }}>{errorMsg || "Tente novamente em alguns instantes."}</div>
 
                   <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
                     <button
@@ -232,7 +193,7 @@ export default function RelatorioPage() {
                         startedAtRef.current = Date.now();
                         tick();
                         stopPolling();
-                        intervalRef.current = setInterval(tick, POLL_EVERY_MS);
+                        intervalRef.current = window.setInterval(tick, POLL_EVERY_MS);
                       }}
                       style={{ background: "#d4af37", color: "#111", border: 0, borderRadius: 10, padding: "10px 14px", fontWeight: 900, cursor: "pointer" }}
                     >
@@ -247,15 +208,6 @@ export default function RelatorioPage() {
                     >
                       Falar no WhatsApp
                     </a>
-
-                    {!isPaid && canLoad && (
-                      <button
-                        onClick={handleGoToCheckout}
-                        style={{ background: "#d4af37", color: "#111", border: 0, borderRadius: 10, padding: "10px 14px", fontWeight: 900, cursor: "pointer" }}
-                      >
-                        🔒 Desbloquear por R$19,90
-                      </button>
-                    )}
                   </div>
 
                   {timedOut && <div style={{ marginTop: 10, color: "#aaa" }}>Dica: PDFs muito pesados ou com imagem podem demorar mais.</div>}
@@ -267,32 +219,24 @@ export default function RelatorioPage() {
           {status === "done" && (
             <div style={{ marginTop: 14 }}>
               <div style={{ border: "1px solid #222", borderRadius: 14, overflow: "hidden", background: "#0f0f0f" }}>
-                <iframe
-                  title="Relatório"
-                  srcDoc={displayHtml || "<div style='padding:16px;color:#aaa'>Relatório vazio.</div>"}
-                  style={{ width: "100%", height: "70vh", border: 0 }}
-                />
+                <iframe title="Relatório" srcDoc={displayHtml || "<div style='padding:16px;color:#aaa'>Relatório vazio.</div>"} style={{ width: "100%", height: "70vh", border: 0 }} />
               </div>
 
               {!isPaid && (
                 <div style={{ marginTop: 14, color: "#aaa" }}>
-                  🔒 Para ver os riscos jurídicos detalhados, dívidas e o parecer final:
-                  <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
-                    <button
-                      onClick={handleGoToCheckout}
-                      style={{
-                        display: "inline-block",
-                        background: "#d4af37",
-                        color: "#111",
-                        borderRadius: 10,
-                        padding: "10px 14px",
-                        fontWeight: 900,
-                        border: 0,
-                        cursor: "pointer",
-                      }}
+                  🔒 Para ver <b>riscos jurídicos detalhados</b>, <b>dívidas e responsabilidades</b> e o <b>parecer final</b>:
+                  <div style={{ marginTop: 10 }}>
+                    <a
+                      href={checkoutUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ display: "inline-block", background: "#d4af37", color: "#111", borderRadius: 10, padding: "10px 14px", fontWeight: 900, textDecoration: "none" }}
                     >
                       🔒 Desbloquear por R$19,90
-                    </button>
+                    </a>
+                  </div>
+                  <div style={{ marginTop: 10, fontSize: 12, color: "#777" }}>
+                    Após pagar, volte para este relatório — o desbloqueio é automático.
                   </div>
                 </div>
               )}
@@ -306,14 +250,8 @@ export default function RelatorioPage() {
   );
 }
 
-/**
- * Aplica paywall cortando o HTML a partir da primeira seção "paga".
- */
-function applyPaywall(html) {
+function applyPaywall(html: string) {
   if (!html) return html;
-
-  const paid = localStorage.getItem(PAID_KEY) === "true";
-  if (paid) return injectBaseTargetTop(html);
 
   const patterns = [
     /riscos\s+jur[ií]dicos\s+detalhados/i,
@@ -327,13 +265,13 @@ function applyPaywall(html) {
 
   let cutIndex = -1;
   for (const p of patterns) {
-    const m = html.match(p);
+    const m = html.match(p) as any;
     if (m && typeof m.index === "number") {
       if (cutIndex === -1 || m.index < cutIndex) cutIndex = m.index;
     }
   }
 
-  if (cutIndex === -1) return injectBaseTargetTop(html);
+  if (cutIndex === -1) return html;
 
   const visible = html.slice(0, cutIndex);
 
@@ -351,50 +289,13 @@ function applyPaywall(html) {
     <div style="color:#aaa; line-height:1.5;">
       Desbloqueie por <b style="color:#d4af37;">R$19,90</b> para ver:
       <ul style="margin:10px 0 0 18px; line-height:1.8; color:#ddd;">
-        <li><b>Riscos jurídicos detalhados</b> (riscos principais)</li>
+        <li><b>Riscos jurídicos detalhados</b></li>
         <li><b>Dívidas e responsabilidades</b></li>
-        <li><b>Vale a pena ou não</b> (parecer final)</li>
+        <li><b>Parecer final</b> (vale a pena ou não)</li>
       </ul>
-    </div>
-    <a href="${KIWIFY_CHECKOUT}?utm_source=relatorio"
-       target="_top"
-       rel="noreferrer"
-       style="
-         display:inline-block;
-         margin-top:14px;
-         background:#d4af37;
-         color:#111;
-         padding:10px 14px;
-         border-radius:12px;
-         text-decoration:none;
-         font-weight:900;
-       ">
-       🔒 Desbloquear por R$19,90
-    </a>
-    <div style="margin-top:10px; color:#777; font-size:12px;">
-      Após pagar, você volta automaticamente para o seu relatório e o conteúdo libera.
     </div>
   </div>
   `;
 
-  return injectBaseTargetTop(visible + paywall);
-}
-
-/**
- * Força qualquer link do srcDoc (iframe) a abrir fora do iframe.
- */
-function injectBaseTargetTop(html) {
-  if (!html) return html;
-
-  if (/<base\s/i.test(html)) return html;
-
-  if (/<head[^>]*>/i.test(html)) {
-    return html.replace(/<head[^>]*>/i, (m) => `${m}\n<base target="_top" />\n`);
-  }
-
-  if (/<html[^>]*>/i.test(html)) {
-    return html.replace(/<html[^>]*>/i, (m) => `${m}\n<head><base target="_top" /></head>\n`);
-  }
-
-  return `<!doctype html><html><head><base target="_top" /></head><body>${html}</body></html>`;
+  return visible + paywall;
 }
