@@ -15,7 +15,7 @@ export default function RelatorioPage() {
 
   const canLoad = Boolean(id && token);
 
-  const [status, setStatus] = useState<"processing" | "done" | "error">("processing");
+  const [status, setStatus] = useState("processing"); // "processing" | "done" | "error"
   const [errorMsg, setErrorMsg] = useState("");
 
   const [reportHtml, setReportHtml] = useState("");
@@ -28,7 +28,7 @@ export default function RelatorioPage() {
   const [timedOut, setTimedOut] = useState(false);
 
   const startedAtRef = useRef(Date.now());
-  const intervalRef = useRef<number | null>(null);
+  const intervalRef = useRef(null);
 
   const STOP_AFTER_MS = 300000; // 5min
   const SLOW_WARN_MS = 90000; // 90s
@@ -36,9 +36,10 @@ export default function RelatorioPage() {
   const POLL_EVERY_MS = 2500; // 2.5s
 
   const WhatsAppLink =
-    "https://wa.me/5511932087649?text=" + encodeURIComponent(`Oi! Preciso de suporte no relatório. Meu ID é: ${id}`);
+    "https://wa.me/5511932087649?text=" +
+    encodeURIComponent(`Oi! Preciso de suporte no relatório. Meu ID é: ${id}`);
 
-  // ✅ checkout com tracking s1/s2 (Kiwify aceita s1/s2/s3) :contentReference[oaicite:2]{index=2}
+  // Checkout com tracking (Kiwify: s1/s2/s3)
   const checkoutUrl = useMemo(() => {
     const base = `${KIWIFY_CHECKOUT}?utm_source=relatorio`;
     if (!id || !token) return base;
@@ -65,11 +66,11 @@ export default function RelatorioPage() {
       throw new Error("Token inválido ou expirado.");
     }
 
-    const stRaw = (data.status || "").toLowerCase().trim();
+    const stRaw = String(data.status || "").toLowerCase().trim();
     const st = stRaw === "erro" ? "error" : stRaw;
 
     return {
-      status: (st as any) || "processing",
+      status: st || "processing",
       report_html: data.report_html || "",
       error_message: data.error_message || "",
       paid_at: data.paid_at || null,
@@ -118,7 +119,7 @@ export default function RelatorioPage() {
       }
 
       setStatus("processing");
-    } catch (e: any) {
+    } catch (e) {
       setStatus("error");
       setErrorMsg(String(e?.message || e || "Erro ao carregar relatório."));
       stopPolling();
@@ -145,8 +146,28 @@ export default function RelatorioPage() {
   return (
     <Layout>
       <div style={{ minHeight: "70vh", display: "flex", justifyContent: "center", padding: "48px 16px" }}>
-        <div style={{ width: "100%", maxWidth: 980, background: "#111", border: "1px solid #222", borderRadius: 16, padding: 20 }}>
-          <div style={{ display: "inline-block", padding: "6px 10px", borderRadius: 999, background: "#1a1a1a", border: "1px solid #2a2a2a", color: "#d4af37", fontWeight: 800, fontSize: 12 }}>
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 980,
+            background: "#111",
+            border: "1px solid #222",
+            borderRadius: 16,
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              display: "inline-block",
+              padding: "6px 10px",
+              borderRadius: 999,
+              background: "#1a1a1a",
+              border: "1px solid #2a2a2a",
+              color: "#d4af37",
+              fontWeight: 800,
+              fontSize: 12,
+            }}
+          >
             PRÉVIA AUTOMÁTICA
           </div>
 
@@ -160,9 +181,15 @@ export default function RelatorioPage() {
               {status === "processing" && (
                 <>
                   <b style={{ color: "#fff" }}>⏳ Analisando seu edital…</b>
-                  <div style={{ marginTop: 8, color: "#aaa" }}>Isso pode levar de alguns segundos a alguns minutos dependendo do PDF.</div>
+                  <div style={{ marginTop: 8, color: "#aaa" }}>
+                    Isso pode levar de alguns segundos a alguns minutos dependendo do PDF.
+                  </div>
 
-                  {slowWarn && <div style={{ marginTop: 12, color: "#d4af37" }}>⚠️ Tá demorando um pouco… mas ainda está processando.</div>}
+                  {slowWarn && (
+                    <div style={{ marginTop: 12, color: "#d4af37" }}>
+                      ⚠️ Tá demorando um pouco… mas ainda está processando.
+                    </div>
+                  )}
 
                   {longWarn && (
                     <div style={{ marginTop: 12, color: "#aaa" }}>
@@ -180,7 +207,9 @@ export default function RelatorioPage() {
               {status === "error" && (
                 <>
                   <b style={{ color: "#fff" }}>❌ Não consegui concluir a análise.</b>
-                  <div style={{ marginTop: 8, color: "#aaa" }}>{errorMsg || "Tente novamente em alguns instantes."}</div>
+                  <div style={{ marginTop: 8, color: "#aaa" }}>
+                    {errorMsg || "Tente novamente em alguns instantes."}
+                  </div>
 
                   <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
                     <button
@@ -195,7 +224,15 @@ export default function RelatorioPage() {
                         stopPolling();
                         intervalRef.current = window.setInterval(tick, POLL_EVERY_MS);
                       }}
-                      style={{ background: "#d4af37", color: "#111", border: 0, borderRadius: 10, padding: "10px 14px", fontWeight: 900, cursor: "pointer" }}
+                      style={{
+                        background: "#d4af37",
+                        color: "#111",
+                        border: 0,
+                        borderRadius: 10,
+                        padding: "10px 14px",
+                        fontWeight: 900,
+                        cursor: "pointer",
+                      }}
                     >
                       Tentar novamente
                     </button>
@@ -204,13 +241,25 @@ export default function RelatorioPage() {
                       href={WhatsAppLink}
                       target="_blank"
                       rel="noreferrer"
-                      style={{ background: "#1a1a1a", border: "1px solid #2a2a2a", borderRadius: 10, padding: "10px 14px", color: "#d4af37", fontWeight: 900, textDecoration: "none" }}
+                      style={{
+                        background: "#1a1a1a",
+                        border: "1px solid #2a2a2a",
+                        borderRadius: 10,
+                        padding: "10px 14px",
+                        color: "#d4af37",
+                        fontWeight: 900,
+                        textDecoration: "none",
+                      }}
                     >
                       Falar no WhatsApp
                     </a>
                   </div>
 
-                  {timedOut && <div style={{ marginTop: 10, color: "#aaa" }}>Dica: PDFs muito pesados ou com imagem podem demorar mais.</div>}
+                  {timedOut && (
+                    <div style={{ marginTop: 10, color: "#aaa" }}>
+                      Dica: PDFs muito pesados ou com imagem podem demorar mais.
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -219,7 +268,11 @@ export default function RelatorioPage() {
           {status === "done" && (
             <div style={{ marginTop: 14 }}>
               <div style={{ border: "1px solid #222", borderRadius: 14, overflow: "hidden", background: "#0f0f0f" }}>
-                <iframe title="Relatório" srcDoc={displayHtml || "<div style='padding:16px;color:#aaa'>Relatório vazio.</div>"} style={{ width: "100%", height: "70vh", border: 0 }} />
+                <iframe
+                  title="Relatório"
+                  srcDoc={displayHtml || "<div style='padding:16px;color:#aaa'>Relatório vazio.</div>"}
+                  style={{ width: "100%", height: "70vh", border: 0 }}
+                />
               </div>
 
               {!isPaid && (
@@ -230,7 +283,15 @@ export default function RelatorioPage() {
                       href={checkoutUrl}
                       target="_blank"
                       rel="noreferrer"
-                      style={{ display: "inline-block", background: "#d4af37", color: "#111", borderRadius: 10, padding: "10px 14px", fontWeight: 900, textDecoration: "none" }}
+                      style={{
+                        display: "inline-block",
+                        background: "#d4af37",
+                        color: "#111",
+                        borderRadius: 10,
+                        padding: "10px 14px",
+                        fontWeight: 900,
+                        textDecoration: "none",
+                      }}
                     >
                       🔒 Desbloquear por R$19,90
                     </a>
@@ -250,7 +311,7 @@ export default function RelatorioPage() {
   );
 }
 
-function applyPaywall(html: string) {
+function applyPaywall(html) {
   if (!html) return html;
 
   const patterns = [
@@ -264,8 +325,9 @@ function applyPaywall(html: string) {
   ];
 
   let cutIndex = -1;
+
   for (const p of patterns) {
-    const m = html.match(p) as any;
+    const m = html.match(p);
     if (m && typeof m.index === "number") {
       if (cutIndex === -1 || m.index < cutIndex) cutIndex = m.index;
     }
