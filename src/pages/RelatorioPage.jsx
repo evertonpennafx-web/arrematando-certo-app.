@@ -96,10 +96,11 @@ export default function RelatorioPage() {
     try {
       const row = await fetchRowOnce();
 
+      // ✅ Se o relatório já existe, sempre renderiza.
+      // ✅ Se ainda NÃO pagou, mantém o polling ligado pra detectar paid_at e liberar automaticamente.
       if (row.status === "done" || row.status === "done_fallback") {
         setStatus("done");
         setErrorMsg("");
-        stopPolling();
 
         const html = row.report_html || "";
         setReportHtml(html);
@@ -107,6 +108,9 @@ export default function RelatorioPage() {
         const paidNow = Boolean(row.paid_at);
         setIsPaid(paidNow);
         setDisplayHtml(paidNow ? html : applyPaywall(html));
+
+        // ✅ Só para quando estiver pago (senão não vai detectar o paid_at chegar depois)
+        if (paidNow) stopPolling();
 
         return;
       }
