@@ -15,7 +15,8 @@ export default function RelatorioPage() {
 
   const canLoad = Boolean(id && token);
 
-  const [status, setStatus] = useState("processing"); // "processing" | "done" | "error"
+  // "processing" | "done" | "error"
+  const [status, setStatus] = useState("processing");
   const [errorMsg, setErrorMsg] = useState("");
 
   const [reportHtml, setReportHtml] = useState("");
@@ -30,16 +31,21 @@ export default function RelatorioPage() {
   const startedAtRef = useRef(Date.now());
   const intervalRef = useRef(null);
 
-  const STOP_AFTER_MS = 300000; // 5min
+  // controla polling pós-done
+  const doneAtRef = useRef(null);
+
+  const STOP_AFTER_MS = 300000; // 5min (para processamento)
+  const STOP_AFTER_DONE_MS = 300000; // 5min (para aguardar pagamento após done)
   const SLOW_WARN_MS = 90000; // 90s
   const LONG_WARN_MS = 180000; // 3min
-  const POLL_EVERY_MS = 2500; // 2.5s
+
+  // polling
+  const POLL_EVERY_MS = 2500;
 
   const WhatsAppLink =
     "https://wa.me/5511932087649?text=" +
     encodeURIComponent(`Oi! Preciso de suporte no relatório. Meu ID é: ${id}`);
 
-  // Checkout com tracking (Kiwify: s1/s2/s3)
   const checkoutUrl = useMemo(() => {
     const base = `${KIWIFY_CHECKOUT}?utm_source=relatorio`;
     if (!id || !token) return base;
@@ -62,6 +68,7 @@ export default function RelatorioPage() {
 
     if (error || !data) throw new Error(error?.message || "Registro não encontrado.");
 
+    // valida token do relatório
     if (data.access_token && token && data.access_token !== token) {
       throw new Error("Token inválido ou expirado.");
     }
@@ -80,41 +87,71 @@ export default function RelatorioPage() {
   async function tick() {
     if (!canLoad) return;
 
-    const elapsed = Date.now() - startedAtRef.current;
+    const now = Date.now();
+    const elapsed = now - startedAtRef.current;
 
-    if (elapsed >= SLOW_WARN_MS) setSlowWarn(true);
-    if (elapsed >= LONG_WARN_MS) setLongWarn(true);
+    // avisos de demora (somente enquanto processa)
+    if (status !== "done") {
+      if (elapsed >= SLOW_WARN_MS) setSlowWarn(true);
+      if (elapsed >= LONG_WARN_MS) setLongWarn(true);
 
-    if (elapsed >= STOP_AFTER_MS) {
-      setTimedOut(true);
-      setStatus("error");
-      setErrorMsg("A análise está demorando mais do que o esperado. Tente novamente.");
-      stopPolling();
-      return;
+      if (elapsed >= STOP_AFTER_MS) {
+        setTimedOut(true);
+        setStatus("error");
+        setErrorMsg("A análise está demorando mais do que o esperado. Tente novamente.");
+        stopPolling();
+        return;
+      }
     }
 
     try {
       const row = await fetchRowOnce();
 
-      // ✅ Se o relatório já existe, sempre renderiza.
-      // ✅ Se ainda NÃO pagou, mantém o polling ligado pra detectar paid_at e liberar automaticamente.
+      const paidNow = Boolean(row.paid_at);
+
+      // Se já estava done e ainda não pagou, continuamos polling até liberar ou estourar timeout pós-done
+      if (status === "done" && !isPaid && !paidNow) {
+        if (!doneAtRef.current) doneAtRef.current = now;
+
+        const doneElapsed = now - doneAtRef.current;
+        if (doneElapsed >= STOP_AFTER_DONE_MS) {
+          // não é erro: só para de “esperar pagamento”
+          stopPolling();
+        }
+        // mantém paywall
+        return;
+      }
+
+      // Se pagou em qualquer momento, libera completo
+      if (paidNow) {
+        setIsPaid(true);
+        if (reportHtml) setDisplayHtml(reportHtml);
+        // se ainda não tinha carregado html por algum motivo, tenta carregar:
+        if (!reportHtml && row.report_html) {
+          setReportHtml(row.report_html);
+          setDisplayHtml(row.report_html);
+        }
+        stopPolling();
+        return;
+      }
+
+      // status pronto do relatório
       if (row.status === "done" || row.status === "done_fallback") {
         setStatus("done");
         setErrorMsg("");
 
+        if (!doneAtRef.current) doneAtRef.current = now;
+
         const html = row.report_html || "";
         setReportHtml(html);
 
-        const paidNow = Boolean(row.paid_at);
-        setIsPaid(paidNow);
-        setDisplayHtml(paidNow ? html : applyPaywall(html));
-
-        // ✅ Só para quando estiver pago (senão não vai detectar o paid_at chegar depois)
-        if (paidNow) stopPolling();
-
+        // ainda não pagou -> mostra paywall, MAS NÃO para polling (aguarda paid_at)
+        setIsPaid(false);
+        setDisplayHtml(applyPaywall(html));
         return;
       }
 
+      // erro
       if (row.status === "error") {
         setStatus("error");
         setErrorMsg(row.error_message || "Não foi possível concluir a análise. Tente novamente.");
@@ -122,6 +159,7 @@ export default function RelatorioPage() {
         return;
       }
 
+      // ainda processando
       setStatus("processing");
     } catch (e) {
       setStatus("error");
@@ -132,6 +170,7 @@ export default function RelatorioPage() {
 
   useEffect(() => {
     startedAtRef.current = Date.now();
+    doneAtRef.current = null;
 
     if (!canLoad) {
       setStatus("error");
@@ -224,6 +263,7 @@ export default function RelatorioPage() {
                         setErrorMsg("");
                         setStatus("processing");
                         startedAtRef.current = Date.now();
+                        doneAtRef.current = null;
                         tick();
                         stopPolling();
                         intervalRef.current = window.setInterval(tick, POLL_EVERY_MS);
@@ -282,7 +322,7 @@ export default function RelatorioPage() {
               {!isPaid && (
                 <div style={{ marginTop: 14, color: "#aaa" }}>
                   🔒 Para ver <b>riscos jurídicos detalhados</b>, <b>dívidas e responsabilidades</b> e o <b>parecer final</b>:
-                  <div style={{ marginTop: 10 }}>
+                  <div style={{ marginTop: 10, display: "flex", gap: 10, flexWrap: "wrap" }}>
                     <a
                       href={checkoutUrl}
                       target="_blank"
@@ -299,9 +339,25 @@ export default function RelatorioPage() {
                     >
                       🔒 Desbloquear por R$19,90
                     </a>
+
+                    <button
+                      onClick={() => tick()}
+                      style={{
+                        background: "#1a1a1a",
+                        border: "1px solid #2a2a2a",
+                        borderRadius: 10,
+                        padding: "10px 14px",
+                        color: "#d4af37",
+                        fontWeight: 900,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Já paguei — verificar agora
+                    </button>
                   </div>
+
                   <div style={{ marginTop: 10, fontSize: 12, color: "#777" }}>
-                    Após pagar, volte para este relatório — o desbloqueio é automático.
+                    Após pagar, volte para este relatório — o desbloqueio é automático (a página fica checando o pagamento).
                   </div>
                 </div>
               )}
