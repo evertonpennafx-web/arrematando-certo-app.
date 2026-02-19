@@ -107,7 +107,7 @@ const HomePage = () => {
             transition={{ duration: 0.8, delay: 0.2 }}
             className="text-xl md:text-2xl text-gray-300 mb-12 max-w-4xl mx-auto"
           >
-            Nosso sistema analisa o edital e destaca riscos ocultos, ocupação, dívidas e armadilhas jurídicas — de forma clara e objetiva.
+            Nosso sistema analisa o edital e destaca riscos ocultos, ocupação, dívidas e armadilhas jurídicas de forma clara e objetiva.
           </motion.p>
 
           <motion.div
