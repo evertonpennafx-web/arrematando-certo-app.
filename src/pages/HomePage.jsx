@@ -67,8 +67,11 @@ const HomePage = () => {
   return (
     <Layout>
       <Helmet>
-        <title>Arrematando Certo - Análise Profissional de Editais de Leilão</title>
-        <meta name="description" content="Transformamos editais de leilão em um resumo claro, objetivo e sem juridiquês. Descubra os ônus, riscos, custos e oportunidades do imóvel antes de dar seu lance." />
+        <title>Arrematando Certo - Evite Armadilhas em Imóveis de Leilão</title>
+        <meta
+          name="description"
+          content="Descubra se um imóvel de leilão pode virar prejuízo antes de dar o lance. Análise automática do edital para identificar riscos, ocupação, dívidas e armadilhas jurídicas."
+        />
       </Helmet>
 
       {/* Hero Section */}
@@ -91,9 +94,9 @@ const HomePage = () => {
             transition={{ duration: 0.8 }}
           >
             <h1 className="text-5xl md:text-7xl font-bold mb-6 leading-tight">
-              Transformamos editais de leilão em um{' '}
+              Descubra se esse imóvel de leilão pode virar um{' '}
               <span className="bg-gradient-to-r from-[#d4af37] to-[#f0d87f] bg-clip-text text-transparent">
-                resumo claro, objetivo e sem juridiquês
+                prejuízo antes de dar o lance
               </span>
             </h1>
           </motion.div>
@@ -104,7 +107,7 @@ const HomePage = () => {
             transition={{ duration: 0.8, delay: 0.2 }}
             className="text-xl md:text-2xl text-gray-300 mb-12 max-w-4xl mx-auto"
           >
-            Descubra os ônus, riscos, custos e oportunidades do imóvel antes de dar seu lance
+            Nosso sistema analisa o edital e destaca riscos ocultos, ocupação, dívidas e armadilhas jurídicas — de forma clara e objetiva.
           </motion.p>
 
           <motion.div
@@ -116,7 +119,7 @@ const HomePage = () => {
               to="/enviar-edital"
               className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-[#d4af37] to-[#b8941f] text-black text-lg font-bold rounded-lg hover:shadow-2xl hover:shadow-[#d4af37]/50 transition-all duration-300 hover:scale-105"
             >
-              Enviar Edital Agora
+              ANALISAR IMÓVEL AGORA
               <ArrowRight className="ml-2 w-5 h-5" />
             </Link>
           </motion.div>
