@@ -16,32 +16,30 @@ import Layout from "@/components/Layout";
 import GradientBackground from "@/components/ui/GradientBackground";
 import { pricingPlans } from "@/lib/stripe";
 
+// ✅ AJUSTE ESTE IMPORT SE O SEU CLIENT ESTIVER EM OUTRO PATH/NOME
+import { supabase } from "@/lib/supabase";
+
 /**
  * ✅ LINKS KIWIFY (já configurados por você)
  */
 const CHECKOUTS = {
-  express: "https://pay.kiwify.com.br/JS51nmm",       // mensal 97
+  express: "https://pay.kiwify.com.br/JS51nmm",        // mensal 97
   express_annual: "https://pay.kiwify.com.br/vc57F2N", // anual 997
-  standard: "https://pay.kiwify.com.br/5urVOdf",      // revisão profissional
+  standard: "https://pay.kiwify.com.br/5urVOdf",       // revisão profissional
 };
 
 export default function SubmissionPage() {
   const location = useLocation();
   const [loading, setLoading] = useState(false);
 
-  // Plan vindo da URL
   const urlPlan = useMemo(() => {
     const params = new URLSearchParams(location.search);
     return (params.get("plan") || "standard").toLowerCase();
   }, [location.search]);
 
-  /**
-   * ✅ Toggle interno (igual Home)
-   * Se entrar com ?plan=express, o usuário escolhe mensal/anual na própria página.
-   */
+  // ✅ Toggle interno: se entra com ?plan=express, escolhe mensal/anual na página
   const [expressBilling, setExpressBilling] = useState("monthly"); // monthly | annual
 
-  // Plan efetivo: se urlPlan=express usamos o toggle; caso contrário, usa o plan da URL
   const effectivePlanKey = useMemo(() => {
     if (urlPlan === "express") {
       return expressBilling === "monthly" ? "express" : "express_annual";
@@ -62,7 +60,6 @@ export default function SubmissionPage() {
     else if (effectivePlanKey === "express_annual") priceLabel = `R$ ${p?.price || "997,00"} /ano`;
     else priceLabel = p?.price ? `R$ ${p.price}` : "Valor sob consulta";
 
-    // bullets padronizados
     const bullets =
       effectivePlanKey === "standard"
         ? [
@@ -98,7 +95,32 @@ export default function SubmissionPage() {
   const emailRef = useRef(null);
   const linkRef = useRef(null);
 
-  function handleSubmit(e) {
+  function getUtmParams() {
+    const params = new URLSearchParams(location.search);
+    return {
+      utm_source: params.get("utm_source"),
+      utm_medium: params.get("utm_medium"),
+      utm_campaign: params.get("utm_campaign"),
+      utm_content: params.get("utm_content"),
+      utm_term: params.get("utm_term"),
+    };
+  }
+
+  async function saveLeadToSupabase(lead) {
+    // Se por algum motivo o supabase client não existir, não quebra o fluxo
+    if (!supabase?.from) return { ok: false, error: "Supabase client not found" };
+
+    const { data, error } = await supabase
+      .from("leads")
+      .insert([lead])
+      .select("id")
+      .single();
+
+    if (error) return { ok: false, error: error.message };
+    return { ok: true, id: data?.id };
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
 
     const nome = (nomeRef.current?.value || "").trim();
@@ -106,7 +128,7 @@ export default function SubmissionPage() {
     const email = (emailRef.current?.value || "").trim();
     const linkLeilao = (linkRef.current?.value || "").trim();
 
-    // ✅ Contato obrigatório em TODOS os planos (como você pediu)
+    // ✅ Contato obrigatório em TODOS os planos
     if (!nome || !whatsapp || !email) {
       alert("Preencha Nome, WhatsApp e E-mail.");
       return;
@@ -118,30 +140,41 @@ export default function SubmissionPage() {
       return;
     }
 
-    setLoading(true);
-
-    const lead = {
-      nome,
-      whatsapp,
-      email,
-      linkLeilao: effectivePlanKey === "standard" ? linkLeilao : "",
-      plan: effectivePlanKey,
-      createdAt: new Date().toISOString(),
-    };
-
-    try {
-      localStorage.setItem("ac_lead", JSON.stringify(lead));
-    } catch (_) {}
-
     const checkout = CHECKOUTS[effectivePlanKey];
-
     if (!checkout) {
       alert("Checkout não configurado para esse plano.");
-      setLoading(false);
       return;
     }
 
-    // ✅ vai direto pro checkout Kiwify
+    setLoading(true);
+
+    const utm = getUtmParams();
+
+    const lead = {
+      source: "submission",
+      plan: effectivePlanKey,
+      nome,
+      whatsapp,
+      email,
+      link_leilao: effectivePlanKey === "standard" ? linkLeilao : null,
+      ...utm,
+      user_agent: typeof navigator !== "undefined" ? navigator.userAgent : null,
+      page_url: typeof window !== "undefined" ? window.location.href : null,
+    };
+
+    // Fallback local
+    try {
+      localStorage.setItem("ac_lead", JSON.stringify({ ...lead, createdAt: new Date().toISOString() }));
+    } catch (_) {}
+
+    // ✅ salva no Supabase antes do checkout
+    const result = await saveLeadToSupabase(lead);
+
+    // Se falhar, a gente não trava venda: segue pro checkout do mesmo jeito
+    if (!result.ok) {
+      console.warn("Lead save failed:", result.error);
+    }
+
     window.location.href = checkout;
   }
 
@@ -272,7 +305,7 @@ export default function SubmissionPage() {
                 <div className="relative bg-gray-900/50 backdrop-blur-sm rounded-2xl border border-gray-800 p-8">
                   <h3 className="text-2xl font-bold mb-2">Preencha para continuar</h3>
                   <p className="text-gray-400 mb-6">
-                    Seus dados serão usados para confirmar o pedido. Em seguida, você será direcionado ao checkout.
+                    Seus dados serão registrados para suporte e confirmação. Em seguida, você será direcionado ao checkout.
                   </p>
 
                   <div className="space-y-4">
@@ -335,7 +368,7 @@ export default function SubmissionPage() {
                           : "bg-gradient-to-r from-[#d4af37] to-[#b8941f] text-black hover:shadow-lg hover:shadow-[#d4af37]/40"
                       }`}
                     >
-                      {loading ? "Abrindo checkout..." : "Ir para pagamento"}
+                      {loading ? "Salvando e abrindo checkout..." : "Ir para pagamento"}
                       <ArrowRight className="w-5 h-5" />
                     </button>
 
