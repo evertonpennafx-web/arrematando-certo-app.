@@ -11,71 +11,77 @@ export const pricingPlans = {
       'Datas principais',
       'Forma de pagamento',
       'Comissão do leiloeiro',
-      'Exemplo de risco identificado',
-      'Até 24 horas'
+      'Exemplo de ponto de atenção',
+      'Em 5 minutos'
     ]
   },
+
+  // ✅ IA + HUMANO (mais valor, mais confiança)
   standard: {
     id: 'standard',
     priceId: 'price_standard_placeholder',
     name: 'Revisão Profissional',
-    description: 'Análise completa de um edital com relatório detalhado.',
+    description: 'IA + revisão humana para uma decisão segura antes do lance.',
     price: '497,00',
     type: 'one-time',
     features: [
       'Análise completa do edital',
-      'Identificação de riscos e oportunidades',
-      'Sugestões para o lance',
-      'Relatório completo em linguagem clara',
+      'Revisão humana dos pontos críticos',
+      'Identificação de riscos, ônus e custos',
+      'Checklist completo antes do lance',
+      'Relatório em linguagem clara (sem juridiquês)',
       'Atendimento via WhatsApp',
-      'Edital, contrato, documentação do imóvel, outros documentos',
+      'Edital + documentação do imóvel (se houver)',
       'PIX, cartão de crédito, transferência bancária',
       'Até 48 horas'
     ]
   },
+
+  // ✅ RECORRÊNCIA (apenas IA / operação escalável)
   express: {
     id: 'express',
     priceId: 'price_express_monthly_placeholder',
-    name: 'Resumo Express',
-    description: 'Assinatura para análise rápida e recorrente de editais.',
-    price: '297,00',
+    name: 'Plano Investidor (Express)',
+    description: 'Para acompanhar oportunidades semanais com rapidez e previsibilidade.',
+    price: '97,00',
     period: 'mês',
     type: 'subscription',
     billing: 'monthly',
     popular: true,
     features: [
-      'Análises ilimitadas por mês (limite justo)',
-      'Prioridade na fila de análise',
+      'Até 4 análises por mês (ideal: 1 por semana)',
       'Relatório express em linguagem clara',
-      'Suporte prioritário via WhatsApp',
-      'Edital, contrato, documentação do imóvel, outros documentos',
-      'PIX, cartão de crédito, transferência bancária',
-      'Até 24 horas'
+      'Prioridade no atendimento',
+      'Suporte via WhatsApp',
+      'Envio de edital e documentos relacionados (se houver)',
+      'Renovação mensal automática',
+      'Prazo: Em 5 minutos'
     ]
   },
+
   express_annual: {
     id: 'express_annual',
     priceId: 'price_express_annual_placeholder',
-    name: 'Resumo Express Anual',
+    name: 'Plano Investidor (Anual)',
     description: 'Assinatura anual com 2 meses grátis.',
-    price: '2.970,00',
+    price: '970,00',
     period: 'ano',
     type: 'subscription',
     billing: 'annual',
-    popular: true,
+    popular: false,
     badge: '2 MESES GRÁTIS',
-    savings: 'Economize R$ 594,00 (2 meses OFF)',
+    savings: 'Economize 2 meses no plano anual',
     features: [
-      'Tudo do plano mensal',
-      '2 meses de assinatura grátis',
-      'Prioridade máxima na fila',
+      'Até 4 análises por mês (48/ano)',
       'Relatório express em linguagem clara',
-      'Suporte prioritário via WhatsApp',
-      'Análises ilimitadas (fair usage)',
+      'Prioridade no atendimento',
+      'Suporte via WhatsApp',
       'Pagamento único anual',
-      'Até 24 horas'
+      'Prazo: Em 5 minutos'
     ]
   },
+
+  // ✅ HIGH TICKET (sem preço no site)
   premium: {
     id: 'premium',
     priceId: null, // Contact for price
@@ -97,22 +103,15 @@ export const pricingPlans = {
 
 export const redirectToCheckout = async (priceId, successUrl, cancelUrl) => {
   try {
-    // This is a simulation since we don't have a real backend in this environment
-    // In a real app, this would fetch from an API endpoint that creates a Stripe session
     console.log('Redirecting to checkout with priceId:', priceId);
-    
-    // Simulate API delay
+
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    // For demonstration purposes, we'll just redirect to the success URL
-    // since we can't actually go to Stripe without a real backend/API key
+
     if (priceId) {
-      // In production, this would be: window.location.href = session.url;
-      // Here we simulate a successful redirect flow for the frontend demo
       const url = new URL(successUrl);
       window.location.href = url.toString();
     } else {
-       throw new Error('Price ID missing');
+      throw new Error('Price ID missing');
     }
 
   } catch (error) {
