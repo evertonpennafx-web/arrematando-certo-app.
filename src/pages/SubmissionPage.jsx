@@ -19,9 +19,6 @@ import { pricingPlans } from "@/lib/stripe";
 // ✅ AJUSTE ESTE IMPORT SE O SEU CLIENT ESTIVER EM OUTRO PATH/NOME
 import { supabase } from "@/lib/supabase";
 
-/**
- * ✅ LINKS KIWIFY
- */
 const CHECKOUTS = {
   express: "https://pay.kiwify.com.br/JS51nmm",        // mensal 97
   express_annual: "https://pay.kiwify.com.br/vc57F2N", // anual 997
@@ -105,16 +102,20 @@ export default function SubmissionPage() {
   }
 
   async function saveLeadToSupabase(lead) {
-    if (!supabase?.from) return { ok: false, error: "Supabase client não encontrado (import errado)." };
+    try {
+      if (!supabase?.from) return { ok: false, error: "Supabase client not found" };
 
-    const { data, error } = await supabase
-      .from("leads")
-      .insert([lead])
-      .select("id")
-      .single();
+      const { data, error } = await supabase
+        .from("leads")
+        .insert([lead])
+        .select("id")
+        .single();
 
-    if (error) return { ok: false, error: error.message };
-    return { ok: true, id: data?.id };
+      if (error) return { ok: false, error: error.message };
+      return { ok: true, id: data?.id };
+    } catch (err) {
+      return { ok: false, error: err?.message || "unknown error" };
+    }
   }
 
   async function handleSubmit(e) {
@@ -162,14 +163,8 @@ export default function SubmissionPage() {
     } catch (_) {}
 
     const result = await saveLeadToSupabase(lead);
-
-    // ✅ se falhar, mostra o motivo (pra gente não ficar no escuro)
     if (!result.ok) {
-      alert(
-        "⚠️ Não consegui salvar o lead no Supabase.\n\nMotivo:\n" +
-          result.error +
-          "\n\nMesmo assim vou abrir o checkout para não travar a venda."
-      );
+      // ✅ silencioso para o usuário (não atrapalha venda)
       console.warn("Lead save failed:", result.error);
     } else {
       console.log("Lead salvo no Supabase! id:", result.id);
@@ -298,7 +293,7 @@ export default function SubmissionPage() {
                 <div className="relative bg-gray-900/50 backdrop-blur-sm rounded-2xl border border-gray-800 p-8">
                   <h3 className="text-2xl font-bold mb-2">Preencha para continuar</h3>
                   <p className="text-gray-400 mb-6">
-                    Seus dados serão registrados para suporte e confirmação. Em seguida, você será direcionado ao checkout.
+                    Em seguida, você será direcionado ao checkout para concluir a compra.
                   </p>
 
                   <div className="space-y-4">
@@ -361,7 +356,7 @@ export default function SubmissionPage() {
                           : "bg-gradient-to-r from-[#d4af37] to-[#b8941f] text-black hover:shadow-lg hover:shadow-[#d4af37]/40"
                       }`}
                     >
-                      {loading ? "Salvando e abrindo checkout..." : "Ir para pagamento"}
+                      {loading ? "Abrindo checkout..." : "Ir para pagamento"}
                       <ArrowRight className="w-5 h-5" />
                     </button>
 
