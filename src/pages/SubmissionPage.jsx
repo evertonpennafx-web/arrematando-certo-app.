@@ -1,32 +1,83 @@
 import { useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { pricingPlans } from "@/lib/stripe";
 
-const WHATSAPP_NUMBER = "5511932087649";
+// ✅ WhatsApp oficial: 11 98341-1251
+// Formato wa.me: 55 + DDD + número (sem traços)
+const WHATSAPP_NUMBER = "5511983411251";
 
 export default function SubmissionPage() {
   const location = useLocation();
   const [loading, setLoading] = useState(false);
 
-  const plan = useMemo(() => {
+  // plan pode vir: standard | express | express_annual | premium ...
+  const planKey = useMemo(() => {
     const params = new URLSearchParams(location.search);
     return (params.get("plan") || "standard").toLowerCase();
   }, [location.search]);
 
   const planInfo = useMemo(() => {
-    const plans = {
-      standard: {
-        title: "Plano Standard",
-        price: "R$ 49/mês",
-        bullets: ["Análises ilimitadas", "Checklist completo", "Relatório rápido"],
-      },
-      express: {
-        title: "Plano Express",
-        price: "R$ 97/mês",
-        bullets: ["Análises ilimitadas", "Prioridade no atendimento", "Suporte para dúvidas do edital"],
-      },
+    // Fonte única: pricingPlans
+    // Fallback: standard
+    const p =
+      pricingPlans?.[planKey] ||
+      (planKey === "annual" ? pricingPlans?.express_annual : null) ||
+      pricingPlans?.standard;
+
+    // Normaliza infos que vamos usar na UI
+    const title = p?.name || "Plano";
+    const features = Array.isArray(p?.features) ? p.features : [];
+
+    // Texto de preço amigável
+    // standard = avulso /análise
+    // express = /mês
+    // express_annual = /ano
+    let priceLabel = "";
+    if (planKey === "standard") {
+      priceLabel = `R$ ${p?.price || "—"} /análise`;
+    } else if (planKey === "express") {
+      priceLabel = `R$ ${p?.price || "—"} /mês`;
+    } else if (planKey === "express_annual") {
+      priceLabel = `R$ ${p?.price || "—"} /ano`;
+    } else {
+      // fallback genérico
+      priceLabel = p?.price ? `R$ ${p.price}` : "Valor sob consulta";
+    }
+
+    // Complementos estratégicos (sem prometer ilimitado)
+    const bullets =
+      planKey === "standard"
+        ? [
+            "1 análise avulsa do edital",
+            "Riscos, ônus e custos destacados",
+            "Checklist completo antes do lance",
+            "Linguagem clara e objetiva (sem juridiquês)",
+          ]
+        : planKey === "express"
+        ? [
+            "3 análises por mês",
+            "Prioridade no atendimento",
+            "Suporte para dúvidas do edital",
+            "Acesso rápido aos relatórios",
+          ]
+        : planKey === "express_annual"
+        ? [
+            "3 análises por mês (36/ano)",
+            "Prioridade no atendimento",
+            "Suporte para dúvidas do edital",
+            "Economia no plano anual",
+          ]
+        : features.length
+        ? features
+        : ["Detalhes do plano serão confirmados no atendimento."];
+
+    return {
+      title,
+      priceLabel,
+      bullets,
+      raw: p,
     };
-    return plans[plan] || plans.standard;
-  }, [plan]);
+  }, [planKey]);
 
   // ✅ Inputs UNCONTROLLED (não perdem foco por re-render)
   const nomeRef = useRef(null);
@@ -51,7 +102,7 @@ export default function SubmissionPage() {
       nome,
       whatsapp,
       email,
-      plan,
+      plan: planKey,
       createdAt: new Date().toISOString(),
     };
 
@@ -59,12 +110,23 @@ export default function SubmissionPage() {
       localStorage.setItem("ac_lead", JSON.stringify(lead));
     } catch (_) {}
 
+    // Mensagem profissional (sem “ilimitadas”)
+    const planSummary =
+      planKey === "standard"
+        ? "Análise avulsa (1 edital)"
+        : planKey === "express"
+        ? "Plano Express (3 análises/mês)"
+        : planKey === "express_annual"
+        ? "Plano Express Anual (3 análises/mês)"
+        : planInfo.title;
+
     const text = encodeURIComponent(
-      `Olá! Quero assinar o ${planInfo.title} (${planInfo.price}).\n\n` +
+      `Olá! Quero contratar: ${planSummary}.\n` +
+        `Preço: ${planInfo.priceLabel}\n\n` +
         `Nome: ${lead.nome}\n` +
         `WhatsApp: ${lead.whatsapp}\n` +
-        `Email: ${lead.email || "-"}\n\n` +
-        `Quero liberar análises ilimitadas.`
+        `E-mail: ${lead.email || "-"}\n\n` +
+        `Pode me orientar no próximo passo para liberar o acesso?`
     );
 
     const url = `https://wa.me/${WHATSAPP_NUMBER}?text=${text}`;
@@ -78,7 +140,7 @@ export default function SubmissionPage() {
 
         <h1 style={h1Style}>{planInfo.title}</h1>
         <p style={subStyle}>
-          {planInfo.price} • Plano: <b>{plan}</b>
+          {planInfo.priceLabel} • Plano: <b>{planKey}</b>
         </p>
 
         <div style={gridStyle}>
@@ -90,7 +152,7 @@ export default function SubmissionPage() {
           </div>
 
           <form onSubmit={handleSubmit} style={cardStyle}>
-            <h3 style={h3Style}>Preencha para liberar o acesso</h3>
+            <h3 style={h3Style}>Preencha para continuar</h3>
 
             <div style={{ display: "grid", gap: 10 }}>
               <input
@@ -118,11 +180,11 @@ export default function SubmissionPage() {
               />
 
               <button type="submit" disabled={loading} style={buttonStyle(loading)}>
-                {loading ? "Abrindo WhatsApp..." : "Falar no WhatsApp e liberar acesso"}
+                {loading ? "Abrindo WhatsApp..." : "Continuar no WhatsApp"}
               </button>
 
               <p style={hintStyle}>
-                MVP: validação por WhatsApp. Depois pluga pagamento.
+                Você será direcionado ao WhatsApp para confirmar os dados e liberar o acesso.
               </p>
             </div>
           </form>
