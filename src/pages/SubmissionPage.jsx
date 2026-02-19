@@ -1,48 +1,32 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { createClient } from "@supabase/supabase-js";
+import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import {
-  ArrowRight,
-  CheckCircle,
-  Shield,
-  Phone,
-  Mail,
-  Link as LinkIcon,
-  Star,
-} from "lucide-react";
+import { ArrowRight, CheckCircle, Shield, Phone, Mail, Link as LinkIcon, Star } from "lucide-react";
 
 import Layout from "@/components/Layout";
 import GradientBackground from "@/components/ui/GradientBackground";
+import { saveLead } from "@/lib/supabase";
 
-// ✅ Kiwify links (os seus)
+// ✅ Kiwify links
 const KIWIFY = {
   express_monthly: "https://pay.kiwify.com.br/JS51nmm",
   express_annual: "https://pay.kiwify.com.br/vc57F2N",
   standard: "https://pay.kiwify.com.br/5urVOdf",
 };
 
-// ✅ Supabase client (Vite)
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase =
-  supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
-
 export default function SubmissionPage() {
   const location = useLocation();
-  const navigate = useNavigate();
 
   const planFromUrl = useMemo(() => {
     const params = new URLSearchParams(location.search);
     return (params.get("plan") || "standard").toLowerCase();
   }, [location.search]);
 
-  // ✅ Express pode alternar mensal/anual aqui também
+  // ✅ toggle mensal/anual quando for express
   const [expressBilling, setExpressBilling] = useState(
     planFromUrl === "express_annual" ? "annual" : "monthly"
   );
 
-  // Se o usuário entrar com plan=express_annual, manter toggle em anual
   useEffect(() => {
     if (planFromUrl === "express_annual") setExpressBilling("annual");
     if (planFromUrl === "express") setExpressBilling("monthly");
@@ -61,7 +45,6 @@ export default function SubmissionPage() {
         badge: "Mais popular",
         title: "Plano Investidor (Express)",
         subtitle: "Para acompanhar oportunidades semanais com rapidez e previsibilidade.",
-        priceLabel: "R$ 97,00 / mês",
         chipLeft: "R$ 97,00 /mês",
         chipRight: "Plano: express",
         features: [
@@ -72,12 +55,12 @@ export default function SubmissionPage() {
         ],
         checkoutUrl: KIWIFY.express_monthly,
         requiresAuctionLink: false,
+        requiresEmail: false,
       },
       express_annual: {
         badge: "2 meses grátis",
         title: "Plano Investidor (Anual)",
         subtitle: "Assinatura anual com 2 meses grátis.",
-        priceLabel: "R$ 997,00 / ano",
         chipLeft: "R$ 997,00 /ano",
         chipRight: "Plano: express_annual",
         features: [
@@ -88,12 +71,12 @@ export default function SubmissionPage() {
         ],
         checkoutUrl: KIWIFY.express_annual,
         requiresAuctionLink: false,
+        requiresEmail: false,
       },
       standard: {
         badge: null,
         title: "Revisão Profissional",
         subtitle: "IA + revisão humana para uma decisão segura antes do lance.",
-        priceLabel: "R$ 497,00 (pagamento único)",
         chipLeft: "R$ 497,00 (pagamento único)",
         chipRight: "Plano: standard",
         features: [
@@ -103,12 +86,15 @@ export default function SubmissionPage() {
           "Entrega em até 48h",
         ],
         checkoutUrl: KIWIFY.standard,
-        requiresAuctionLink: true,
+        requiresAuctionLink: true, // ✅ obrigatório para revisao profissional
+        requiresEmail: true, // ✅ email obrigatório para contato
       },
     };
 
     return plans[effectivePlan] || plans.standard;
   }, [effectivePlan]);
+
+  const isExpressFamily = planFromUrl === "express" || planFromUrl === "express_annual";
 
   // form
   const [nome, setNome] = useState("");
@@ -117,90 +103,53 @@ export default function SubmissionPage() {
   const [linkLeilao, setLinkLeilao] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const fadeInUp = {
-    initial: { opacity: 0, y: 30 },
-    animate: { opacity: 1, y: 0 },
-    transition: { duration: 0.6 },
-  };
-
-  function normalizeWhatsapp(value) {
-    // mantém só dígitos
-    return (value || "").replace(/\D/g, "");
-  }
-
-  async function saveLead() {
-    // salva no localStorage sempre (backup)
-    const payload = {
-      source: "submission",
-      plan: effectivePlan,
-      nome: nome.trim(),
-      whatsapp: normalizeWhatsapp(whatsapp),
-      email: email.trim() || null,
-      link_leilao: planInfo.requiresAuctionLink ? (linkLeilao.trim() || null) : null,
-      createdAt: new Date().toISOString(),
-    };
-
-    try {
-      localStorage.setItem("ac_lead", JSON.stringify(payload));
-    } catch (_) {}
-
-    // salva no Supabase (se configurado)
-    if (!supabase) return;
-
-    try {
-      // ✅ Importante: aguardar o insert antes do redirect (senão o browser aborta a request)
-      await supabase.from("leads").insert([
-        {
-          source: payload.source,
-          plan: payload.plan,
-          nome: payload.nome,
-          whatsapp: payload.whatsapp,
-          email: payload.email,
-          link_leilao: payload.link_leilao,
-        },
-      ]);
-    } catch (err) {
-      // ❌ NÃO MOSTRAR PARA O CLIENTE
-      console.warn("Falha ao salvar lead no Supabase (seguindo para checkout):", err);
-    }
+  function normalizeWhatsapp(v) {
+    return (v || "").replace(/\D/g, "");
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
 
     const nomeOk = nome.trim().length >= 2;
-    const whatsappOk = normalizeWhatsapp(whatsapp).length >= 10; // DDD+num mínimo
+    const whatsappOk = normalizeWhatsapp(whatsapp).length >= 10;
 
-    if (!nomeOk || !whatsappOk) {
-      // sem alert feio: só feedback simples
-      // (se quiser, eu coloco toast depois)
-      return;
-    }
+    if (!nomeOk || !whatsappOk) return;
 
-    if (planInfo.requiresAuctionLink) {
-      const linkOk = (linkLeilao || "").trim().length >= 8;
-      const emailOk = (email || "").trim().length >= 5;
-      if (!emailOk || !linkOk) return;
-    }
+    if (planInfo.requiresEmail && (email || "").trim().length < 5) return;
+    if (planInfo.requiresAuctionLink && (linkLeilao || "").trim().length < 8) return;
 
     setLoading(true);
 
-    // 1) salva lead
-    await saveLead();
+    // ✅ salva lead antes de redirecionar
+    const payload = {
+      source: "submission",
+      plan: effectivePlan,
+      nome: nome.trim(),
+      whatsapp: normalizeWhatsapp(whatsapp),
+      email: (email || "").trim() || null,
+      link_leilao: planInfo.requiresAuctionLink ? (linkLeilao || "").trim() : null,
+    };
 
-    // 2) pequeno delay opcional ajuda a não abortar request em alguns browsers
+    const res = await saveLead(payload);
+
+    // ❌ Nunca mostrar erro pro cliente
+    if (!res?.ok) console.warn("Falha ao salvar lead no Supabase (seguindo checkout):", res);
+
+    // ✅ micro delay ajuda alguns browsers a concluir a request antes do redirect
     await new Promise((r) => setTimeout(r, 250));
 
-    // 3) checkout
     window.location.assign(planInfo.checkoutUrl);
   }
 
-  const isExpressFamily = planFromUrl === "express" || planFromUrl === "express_annual";
+  const fadeInUp = {
+    initial: { opacity: 0, y: 30 },
+    animate: { opacity: 1, y: 0 },
+    transition: { duration: 0.6 },
+  };
 
   return (
     <Layout>
       <section className="relative min-h-screen overflow-hidden">
-        {/* Background */}
         <div className="absolute inset-0">
           <img
             src="https://images.unsplash.com/photo-1541806631522-7a6c17387462"
@@ -245,12 +194,10 @@ export default function SubmissionPage() {
                 {planInfo.title.split(" ").slice(1).join(" ")}
               </span>
             </h1>
-            <p className="text-lg md:text-xl text-gray-300 mt-3 max-w-3xl">
-              {planInfo.subtitle}
-            </p>
+            <p className="text-lg md:text-xl text-gray-300 mt-3 max-w-3xl">{planInfo.subtitle}</p>
           </motion.div>
 
-          {/* Toggle (só para Express) */}
+          {/* ✅ Toggle igual da home (apenas express) */}
           {isExpressFamily && (
             <motion.div {...fadeInUp} className="mb-10">
               <div className="inline-flex bg-gray-900/50 border border-gray-800 rounded-lg p-1">
@@ -281,7 +228,7 @@ export default function SubmissionPage() {
           )}
 
           <div className="grid lg:grid-cols-2 gap-8 items-start">
-            {/* Left card */}
+            {/* Left */}
             <motion.div {...fadeInUp} className="relative">
               <div className="absolute inset-0 bg-gradient-to-br from-[#d4af37]/15 to-transparent rounded-2xl blur-xl" />
               <div className="relative bg-gray-900/40 backdrop-blur-md border border-gray-800 rounded-2xl p-8">
@@ -302,9 +249,10 @@ export default function SubmissionPage() {
               </div>
             </motion.div>
 
-            {/* Right card (form) */}
+            {/* Right */}
             <motion.div {...fadeInUp} className="relative">
               <div className="absolute inset-0 bg-gradient-to-br from-[#d4af37]/10 to-transparent rounded-2xl blur-xl" />
+
               <form
                 onSubmit={handleSubmit}
                 className="relative bg-gray-900/40 backdrop-blur-md border border-gray-800 rounded-2xl p-8"
@@ -348,7 +296,12 @@ export default function SubmissionPage() {
                   <div>
                     <label className="flex items-center gap-2 text-sm font-semibold text-[#d4af37] mb-2">
                       <Mail className="w-4 h-4" />
-                      E-mail {planInfo.requiresAuctionLink ? <span className="text-red-400">*</span> : <span className="text-gray-400">(opcional)</span>}
+                      E-mail{" "}
+                      {planInfo.requiresEmail ? (
+                        <span className="text-red-400">*</span>
+                      ) : (
+                        <span className="text-gray-400">(opcional)</span>
+                      )}
                     </label>
                     <input
                       value={email}
@@ -356,7 +309,7 @@ export default function SubmissionPage() {
                       placeholder="seu@email.com"
                       className="w-full bg-black/40 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d4af37]/70"
                       autoComplete="email"
-                      required={planInfo.requiresAuctionLink}
+                      required={planInfo.requiresEmail}
                     />
                   </div>
 
@@ -392,15 +345,6 @@ export default function SubmissionPage() {
                   <p className="text-xs text-gray-400">
                     Ao continuar, você será direcionado para a página segura de pagamento (Kiwify).
                   </p>
-
-                  {/* Se quiser manter o usuário sempre no fluxo, evita navegação estranha */}
-                  <button
-                    type="button"
-                    onClick={() => navigate("/")}
-                    className="text-xs text-gray-400 hover:text-white underline underline-offset-4"
-                  >
-                    Voltar para Home
-                  </button>
                 </div>
               </form>
             </motion.div>
