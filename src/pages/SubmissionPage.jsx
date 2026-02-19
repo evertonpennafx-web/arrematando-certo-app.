@@ -20,7 +20,7 @@ import { pricingPlans } from "@/lib/stripe";
 import { supabase } from "@/lib/supabase";
 
 /**
- * ✅ LINKS KIWIFY (já configurados por você)
+ * ✅ LINKS KIWIFY
  */
 const CHECKOUTS = {
   express: "https://pay.kiwify.com.br/JS51nmm",        // mensal 97
@@ -37,7 +37,6 @@ export default function SubmissionPage() {
     return (params.get("plan") || "standard").toLowerCase();
   }, [location.search]);
 
-  // ✅ Toggle interno: se entra com ?plan=express, escolhe mensal/anual na página
   const [expressBilling, setExpressBilling] = useState("monthly"); // monthly | annual
 
   const effectivePlanKey = useMemo(() => {
@@ -89,7 +88,6 @@ export default function SubmissionPage() {
     return { title, description, badge, priceLabel, bullets };
   }, [effectivePlanKey]);
 
-  // Inputs uncontrolled
   const nomeRef = useRef(null);
   const whatsappRef = useRef(null);
   const emailRef = useRef(null);
@@ -107,8 +105,7 @@ export default function SubmissionPage() {
   }
 
   async function saveLeadToSupabase(lead) {
-    // Se por algum motivo o supabase client não existir, não quebra o fluxo
-    if (!supabase?.from) return { ok: false, error: "Supabase client not found" };
+    if (!supabase?.from) return { ok: false, error: "Supabase client não encontrado (import errado)." };
 
     const { data, error } = await supabase
       .from("leads")
@@ -128,13 +125,11 @@ export default function SubmissionPage() {
     const email = (emailRef.current?.value || "").trim();
     const linkLeilao = (linkRef.current?.value || "").trim();
 
-    // ✅ Contato obrigatório em TODOS os planos
     if (!nome || !whatsapp || !email) {
       alert("Preencha Nome, WhatsApp e E-mail.");
       return;
     }
 
-    // ✅ Standard exige link do leilão obrigatório
     if (effectivePlanKey === "standard" && !linkLeilao) {
       alert("Informe o link do leilão (obrigatório para Revisão Profissional).");
       return;
@@ -162,17 +157,22 @@ export default function SubmissionPage() {
       page_url: typeof window !== "undefined" ? window.location.href : null,
     };
 
-    // Fallback local
     try {
       localStorage.setItem("ac_lead", JSON.stringify({ ...lead, createdAt: new Date().toISOString() }));
     } catch (_) {}
 
-    // ✅ salva no Supabase antes do checkout
     const result = await saveLeadToSupabase(lead);
 
-    // Se falhar, a gente não trava venda: segue pro checkout do mesmo jeito
+    // ✅ se falhar, mostra o motivo (pra gente não ficar no escuro)
     if (!result.ok) {
+      alert(
+        "⚠️ Não consegui salvar o lead no Supabase.\n\nMotivo:\n" +
+          result.error +
+          "\n\nMesmo assim vou abrir o checkout para não travar a venda."
+      );
       console.warn("Lead save failed:", result.error);
+    } else {
+      console.log("Lead salvo no Supabase! id:", result.id);
     }
 
     window.location.href = checkout;
@@ -213,13 +213,9 @@ export default function SubmissionPage() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
             >
-              <h1 className="text-4xl md:text-5xl font-bold mb-4">
-                {planInfo.title}
-              </h1>
+              <h1 className="text-4xl md:text-5xl font-bold mb-4">{planInfo.title}</h1>
 
-              <p className="text-gray-300 text-lg max-w-3xl mb-4">
-                {planInfo.description}
-              </p>
+              <p className="text-gray-300 text-lg max-w-3xl mb-4">{planInfo.description}</p>
 
               <div className="flex flex-wrap items-center gap-3 text-gray-300">
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-gray-900/40 border border-gray-800 backdrop-blur-sm">
@@ -234,7 +230,6 @@ export default function SubmissionPage() {
                 </div>
               </div>
 
-              {/* ✅ Toggle igual da Home: só aparece quando entra em ?plan=express */}
               {urlPlan === "express" && (
                 <div className="mt-6 inline-flex items-center bg-gray-800 p-1 rounded-lg">
                   <button
@@ -265,7 +260,6 @@ export default function SubmissionPage() {
             </motion.div>
 
             <div className="grid lg:grid-cols-2 gap-8 mt-10">
-              {/* BENEFÍCIOS */}
               <motion.div
                 initial={{ opacity: 0, y: 18 }}
                 whileInView={{ opacity: 1, y: 0 }}
@@ -292,7 +286,6 @@ export default function SubmissionPage() {
                 </div>
               </motion.div>
 
-              {/* FORM + CHECKOUT */}
               <motion.form
                 onSubmit={handleSubmit}
                 initial={{ opacity: 0, y: 18 }}
