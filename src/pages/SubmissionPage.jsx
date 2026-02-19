@@ -1,61 +1,84 @@
 import { useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion } from "framer-motion";
-import { CheckCircle, ArrowRight, Mail, User, Phone, Shield, Star, Link as LinkIcon } from "lucide-react";
+import {
+  CheckCircle,
+  ArrowRight,
+  Mail,
+  User,
+  Phone,
+  Shield,
+  Star,
+  Link as LinkIcon,
+} from "lucide-react";
 
 import Layout from "@/components/Layout";
 import GradientBackground from "@/components/ui/GradientBackground";
 import { pricingPlans } from "@/lib/stripe";
 
 /**
- * ✅ COLE AQUI OS LINKS DA KIWIFY
- * Dica: deixe os dois (mensal e anual) e o standard.
+ * ✅ LINKS KIWIFY (já configurados por você)
  */
 const CHECKOUTS = {
-  express: "COLE_LINK_KIWIFY_MENSAL",
-  express_annual: "COLE_LINK_KIWIFY_ANUAL",
-  standard: "COLE_LINK_KIWIFY_REVISAO",
+  express: "https://pay.kiwify.com.br/JS51nmm",       // mensal 97
+  express_annual: "https://pay.kiwify.com.br/vc57F2N", // anual 997
+  standard: "https://pay.kiwify.com.br/5urVOdf",      // revisão profissional
 };
 
 export default function SubmissionPage() {
   const location = useLocation();
   const [loading, setLoading] = useState(false);
 
-  const planKey = useMemo(() => {
+  // Plan vindo da URL
+  const urlPlan = useMemo(() => {
     const params = new URLSearchParams(location.search);
     return (params.get("plan") || "standard").toLowerCase();
   }, [location.search]);
 
+  /**
+   * ✅ Toggle interno (igual Home)
+   * Se entrar com ?plan=express, o usuário escolhe mensal/anual na própria página.
+   */
+  const [expressBilling, setExpressBilling] = useState("monthly"); // monthly | annual
+
+  // Plan efetivo: se urlPlan=express usamos o toggle; caso contrário, usa o plan da URL
+  const effectivePlanKey = useMemo(() => {
+    if (urlPlan === "express") {
+      return expressBilling === "monthly" ? "express" : "express_annual";
+    }
+    return urlPlan;
+  }, [urlPlan, expressBilling]);
+
   const planInfo = useMemo(() => {
-    const p = pricingPlans?.[planKey] || pricingPlans?.standard;
+    const p = pricingPlans?.[effectivePlanKey] || pricingPlans?.standard;
 
     const title = p?.name || "Plano";
     const description = p?.description || "";
     const badge = p?.badge || (p?.popular ? "Mais Popular" : null);
 
     let priceLabel = "";
-    if (planKey === "standard") priceLabel = `R$ ${p?.price || "—"} (pagamento único)`;
-    else if (planKey === "express") priceLabel = `R$ ${p?.price || "—"} /mês`;
-    else if (planKey === "express_annual") priceLabel = `R$ ${p?.price || "—"} /ano`;
+    if (effectivePlanKey === "standard") priceLabel = `R$ ${p?.price || "497,00"} (pagamento único)`;
+    else if (effectivePlanKey === "express") priceLabel = `R$ ${p?.price || "97,00"} /mês`;
+    else if (effectivePlanKey === "express_annual") priceLabel = `R$ ${p?.price || "997,00"} /ano`;
     else priceLabel = p?.price ? `R$ ${p.price}` : "Valor sob consulta";
 
     // bullets padronizados
     const bullets =
-      planKey === "standard"
+      effectivePlanKey === "standard"
         ? [
             "IA + revisão humana dos pontos críticos",
             "Riscos, ônus e custos destacados",
             "Checklist completo antes do lance",
             "Entrega em até 48h",
           ]
-        : planKey === "express"
+        : effectivePlanKey === "express"
         ? [
             "Até 4 análises por mês (ideal: 1 por semana)",
             "Relatório express em linguagem clara",
             "Prioridade no atendimento",
             "Prazo: até 24h",
           ]
-        : planKey === "express_annual"
+        : effectivePlanKey === "express_annual"
         ? [
             "Até 4 análises por mês (48/ano)",
             "Pagamento único anual",
@@ -67,7 +90,7 @@ export default function SubmissionPage() {
         : ["Detalhes do plano serão confirmados no atendimento."];
 
     return { title, description, badge, priceLabel, bullets };
-  }, [planKey]);
+  }, [effectivePlanKey]);
 
   // Inputs uncontrolled
   const nomeRef = useRef(null);
@@ -83,14 +106,14 @@ export default function SubmissionPage() {
     const email = (emailRef.current?.value || "").trim();
     const linkLeilao = (linkRef.current?.value || "").trim();
 
-    // ✅ Contato obrigatório em TODOS os planos pagos (como você pediu)
+    // ✅ Contato obrigatório em TODOS os planos (como você pediu)
     if (!nome || !whatsapp || !email) {
       alert("Preencha Nome, WhatsApp e E-mail.");
       return;
     }
 
-    // ✅ Standard exige link obrigatório
-    if (planKey === "standard" && !linkLeilao) {
+    // ✅ Standard exige link do leilão obrigatório
+    if (effectivePlanKey === "standard" && !linkLeilao) {
       alert("Informe o link do leilão (obrigatório para Revisão Profissional).");
       return;
     }
@@ -101,25 +124,24 @@ export default function SubmissionPage() {
       nome,
       whatsapp,
       email,
-      linkLeilao,
-      plan: planKey,
+      linkLeilao: effectivePlanKey === "standard" ? linkLeilao : "",
+      plan: effectivePlanKey,
       createdAt: new Date().toISOString(),
     };
 
-    // ✅ salva pra você recuperar depois (pode migrar pra Supabase já já)
     try {
       localStorage.setItem("ac_lead", JSON.stringify(lead));
     } catch (_) {}
 
-    const checkout = CHECKOUTS[planKey];
+    const checkout = CHECKOUTS[effectivePlanKey];
 
-    if (!checkout || checkout.includes("COLE_LINK_KIWIFY")) {
-      alert("Checkout da Kiwify ainda não foi configurado nesse plano.");
+    if (!checkout) {
+      alert("Checkout não configurado para esse plano.");
       setLoading(false);
       return;
     }
 
-    // ✅ vai direto pro checkout
+    // ✅ vai direto pro checkout Kiwify
     window.location.href = checkout;
   }
 
@@ -138,7 +160,10 @@ export default function SubmissionPage() {
         <div className="relative z-10 w-full">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-14">
             <div className="flex items-center justify-between gap-4 mb-8">
-              <Link to="/" className="text-gray-300 hover:text-white transition inline-flex items-center gap-2">
+              <Link
+                to="/"
+                className="text-gray-300 hover:text-white transition inline-flex items-center gap-2"
+              >
                 ← Voltar
               </Link>
 
@@ -171,10 +196,39 @@ export default function SubmissionPage() {
 
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-gray-900/40 border border-gray-800 backdrop-blur-sm">
                   <span className="text-sm opacity-90">
-                    Plano: <b className="text-white">{planKey}</b>
+                    Plano: <b className="text-white">{effectivePlanKey}</b>
                   </span>
                 </div>
               </div>
+
+              {/* ✅ Toggle igual da Home: só aparece quando entra em ?plan=express */}
+              {urlPlan === "express" && (
+                <div className="mt-6 inline-flex items-center bg-gray-800 p-1 rounded-lg">
+                  <button
+                    type="button"
+                    onClick={() => setExpressBilling("monthly")}
+                    className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${
+                      expressBilling === "monthly"
+                        ? "bg-[#d4af37] text-black"
+                        : "text-gray-300 hover:text-white"
+                    }`}
+                  >
+                    Mensal
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setExpressBilling("annual")}
+                    className={`px-4 py-2 text-sm font-bold rounded-md transition-all ${
+                      expressBilling === "annual"
+                        ? "bg-[#d4af37] text-black"
+                        : "text-gray-300 hover:text-white"
+                    }`}
+                  >
+                    Anual
+                  </button>
+                </div>
+              )}
             </motion.div>
 
             <div className="grid lg:grid-cols-2 gap-8 mt-10">
@@ -218,7 +272,7 @@ export default function SubmissionPage() {
                 <div className="relative bg-gray-900/50 backdrop-blur-sm rounded-2xl border border-gray-800 p-8">
                   <h3 className="text-2xl font-bold mb-2">Preencha para continuar</h3>
                   <p className="text-gray-400 mb-6">
-                    Seus dados serão enviados para confirmar o pedido e você será direcionado ao checkout.
+                    Seus dados serão usados para confirmar o pedido. Em seguida, você será direcionado ao checkout.
                   </p>
 
                   <div className="space-y-4">
@@ -258,7 +312,7 @@ export default function SubmissionPage() {
                       />
                     </div>
 
-                    {planKey === "standard" && (
+                    {effectivePlanKey === "standard" && (
                       <div>
                         <label className="text-sm text-[#d4af37] font-semibold inline-flex items-center gap-2 mb-2">
                           <LinkIcon className="w-4 h-4" />
