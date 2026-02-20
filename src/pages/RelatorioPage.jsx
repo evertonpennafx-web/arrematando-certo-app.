@@ -4,18 +4,8 @@ import { supabase } from "@/lib/supabase";
 
 const KIWIFY_CHECKOUT = "https://pay.kiwify.com.br/UqeERMG";
 
-/* ===========================
-   PREÇO CENTRALIZADO (NUNCA MAIS CAÇA)
-=========================== */
-const UNLOCK_PRICE_CENTS = 3990;
-
-const formatBRL = (cents) =>
-  (cents / 100).toLocaleString("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-  });
-
-const UNLOCK_PRICE_LABEL = formatBRL(UNLOCK_PRICE_CENTS);
+// ✅ SOMENTE PREÇO ALTERADO AQUI
+const UNLOCK_PRICE_LABEL = "R$39,90";
 
 function useQuery() {
   return useMemo(() => new URLSearchParams(window.location.search), []);
@@ -28,7 +18,7 @@ export default function RelatorioPage() {
 
   const canLoad = Boolean(id && token);
 
-  const [status, setStatus] = useState("processing");
+  const [status, setStatus] = useState("processing"); // "processing" | "done" | "error"
   const [errorMsg, setErrorMsg] = useState("");
 
   const [reportHtml, setReportHtml] = useState("");
@@ -43,15 +33,16 @@ export default function RelatorioPage() {
   const startedAtRef = useRef(Date.now());
   const intervalRef = useRef(null);
 
-  const STOP_AFTER_MS = 300000;
-  const SLOW_WARN_MS = 90000;
-  const LONG_WARN_MS = 180000;
-  const POLL_EVERY_MS = 2500;
+  const STOP_AFTER_MS = 300000; // 5min
+  const SLOW_WARN_MS = 90000; // 90s
+  const LONG_WARN_MS = 180000; // 3min
+  const POLL_EVERY_MS = 2500; // 2.5s
 
   const WhatsAppLink =
     "https://wa.me/5511932087649?text=" +
     encodeURIComponent(`Oi! Preciso de suporte no relatório. Meu ID é: ${id}`);
 
+  // Checkout com tracking (Kiwify: s1/s2/s3)
   const checkoutUrl = useMemo(() => {
     const base = `${KIWIFY_CHECKOUT}?utm_source=relatorio`;
     if (!id || !token) return base;
@@ -65,6 +56,9 @@ export default function RelatorioPage() {
     }
   }
 
+  // ✅ CORREÇÃO DEFINITIVA:
+  // Busca o registro pelo par (id + access_token).
+  // Isso evita loop infinito e garante que só abre o relatório do link correto.
   async function fetchRowOnce() {
     const { data, error } = await supabase
       .from("preview_gratuito")
@@ -109,6 +103,7 @@ export default function RelatorioPage() {
 
       if (row.status === "done" || row.status === "done_fallback") {
         setStatus("done");
+        setErrorMsg("");
         stopPolling();
 
         const html = row.report_html || "";
@@ -123,15 +118,16 @@ export default function RelatorioPage() {
 
       if (row.status === "error") {
         setStatus("error");
-        setErrorMsg(row.error_message || "Não foi possível concluir a análise.");
+        setErrorMsg(row.error_message || "Não foi possível concluir a análise. Tente novamente.");
         stopPolling();
         return;
       }
 
       setStatus("processing");
     } catch (e) {
+      // ✅ Se der erro de id/token, mostramos erro de verdade (não fica preso em processing)
       setStatus("error");
-      setErrorMsg(String(e?.message || e));
+      setErrorMsg(String(e?.message || e || "Erro ao carregar relatório."));
       stopPolling();
     }
   }
@@ -141,7 +137,7 @@ export default function RelatorioPage() {
 
     if (!canLoad) {
       setStatus("error");
-      setErrorMsg("Link inválido.");
+      setErrorMsg("Link inválido. Verifique se o link contém ?id= e &t=.");
       return;
     }
 
@@ -150,31 +146,144 @@ export default function RelatorioPage() {
     intervalRef.current = window.setInterval(tick, POLL_EVERY_MS);
 
     return () => stopPolling();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, token]);
 
   return (
     <Layout>
       <div style={{ minHeight: "70vh", display: "flex", justifyContent: "center", padding: "48px 16px" }}>
-        <div style={{ width: "100%", maxWidth: 980, background: "#111", border: "1px solid #222", borderRadius: 16, padding: 20 }}>
-          <div style={{ display: "inline-block", padding: "6px 10px", borderRadius: 999, background: "#1a1a1a", border: "1px solid #2a2a2a", color: "#d4af37", fontWeight: 800, fontSize: 12 }}>
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 980,
+            background: "#111",
+            border: "1px solid #222",
+            borderRadius: 16,
+            padding: 20,
+          }}
+        >
+          <div
+            style={{
+              display: "inline-block",
+              padding: "6px 10px",
+              borderRadius: 999,
+              background: "#1a1a1a",
+              border: "1px solid #2a2a2a",
+              color: "#d4af37",
+              fontWeight: 800,
+              fontSize: 12,
+            }}
+          >
             PRÉVIA AUTOMÁTICA
           </div>
 
           <h1 style={{ margin: "10px 0 6px", fontSize: 22, color: "#fff" }}>Relatório</h1>
+          <p style={{ marginTop: 0, color: "#aaa" }}>
+            Importante: esta é uma <b>prévia automática</b> e não substitui análise jurídica.
+          </p>
+
+          {status !== "done" && (
+            <div style={{ marginTop: 14, padding: 14, borderRadius: 14, border: "1px solid #222", background: "#0f0f0f" }}>
+              {status === "processing" && (
+                <>
+                  <b style={{ color: "#fff" }}>⏳ Analisando seu edital…</b>
+                  <div style={{ marginTop: 8, color: "#aaa" }}>
+                    Isso pode levar de alguns segundos a alguns minutos dependendo do PDF.
+                  </div>
+
+                  {slowWarn && (
+                    <div style={{ marginTop: 12, color: "#d4af37" }}>
+                      ⚠️ Tá demorando um pouco… mas ainda está processando.
+                    </div>
+                  )}
+
+                  {longWarn && (
+                    <div style={{ marginTop: 12, color: "#aaa" }}>
+                      Se preferir, me chame no WhatsApp:
+                      <div style={{ marginTop: 8 }}>
+                        <a href={WhatsAppLink} target="_blank" rel="noreferrer" style={{ color: "#d4af37", fontWeight: 800 }}>
+                          Falar no WhatsApp
+                        </a>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {status === "error" && (
+                <>
+                  <b style={{ color: "#fff" }}>❌ Não consegui carregar o relatório.</b>
+                  <div style={{ marginTop: 8, color: "#aaa" }}>
+                    {errorMsg || "Tente novamente em alguns instantes."}
+                  </div>
+
+                  <div style={{ display: "flex", gap: 12, marginTop: 14, flexWrap: "wrap" }}>
+                    <button
+                      onClick={() => {
+                        setTimedOut(false);
+                        setSlowWarn(false);
+                        setLongWarn(false);
+                        setErrorMsg("");
+                        setStatus("processing");
+                        startedAtRef.current = Date.now();
+                        tick();
+                        stopPolling();
+                        intervalRef.current = window.setInterval(tick, POLL_EVERY_MS);
+                      }}
+                      style={{
+                        background: "#d4af37",
+                        color: "#111",
+                        border: 0,
+                        borderRadius: 10,
+                        padding: "10px 14px",
+                        fontWeight: 900,
+                        cursor: "pointer",
+                      }}
+                    >
+                      Tentar novamente
+                    </button>
+
+                    <a
+                      href={WhatsAppLink}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{
+                        background: "#1a1a1a",
+                        border: "1px solid #2a2a2a",
+                        borderRadius: 10,
+                        padding: "10px 14px",
+                        color: "#d4af37",
+                        fontWeight: 900,
+                        textDecoration: "none",
+                      }}
+                    >
+                      Falar no WhatsApp
+                    </a>
+                  </div>
+
+                  {timedOut && (
+                    <div style={{ marginTop: 10, color: "#aaa" }}>
+                      Dica: PDFs muito pesados ou com imagem podem demorar mais.
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )}
 
           {status === "done" && (
             <div style={{ marginTop: 14 }}>
               <div style={{ border: "1px solid #222", borderRadius: 14, overflow: "hidden", background: "#0f0f0f" }}>
                 <iframe
                   title="Relatório"
-                  srcDoc={displayHtml}
+                  srcDoc={displayHtml || "<div style='padding:16px;color:#aaa'>Relatório vazio.</div>"}
                   style={{ width: "100%", height: "70vh", border: 0 }}
                 />
               </div>
 
               {!isPaid && (
                 <div style={{ marginTop: 14, color: "#aaa" }}>
-                  🔒 Para ver os detalhes completos:
+                  🔒 Para ver <b>riscos jurídicos detalhados</b>, <b>dívidas e responsabilidades</b> e o <b>parecer final</b>:
                   <div style={{ marginTop: 10 }}>
                     <a
                       href={checkoutUrl}
@@ -190,11 +299,17 @@ export default function RelatorioPage() {
                         textDecoration: "none",
                       }}
                     >
+                      {/* ✅ SOMENTE TEXTO DO PREÇO ALTERADO */}
                       🔒 Desbloquear por {UNLOCK_PRICE_LABEL}
                     </a>
                   </div>
+                  <div style={{ marginTop: 10, fontSize: 12, color: "#777" }}>
+                    Após pagar, volte para este relatório — o desbloqueio é automático.
+                  </div>
                 </div>
               )}
+
+              {isPaid && <div style={{ marginTop: 14, color: "#aaa" }}>✅ Conteúdo desbloqueado.</div>}
             </div>
           )}
         </div>
@@ -203,24 +318,54 @@ export default function RelatorioPage() {
   );
 }
 
-/* ===========================
-   PAYWALL COM PREÇO DINÂMICO
-=========================== */
 function applyPaywall(html) {
   if (!html) return html;
 
-  const price =
-    (3990 / 100).toLocaleString("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    });
+  const patterns = [
+    /riscos\s+jur[ií]dicos\s+detalhados/i,
+    /riscos\s+principais/i,
+    /d[ií]vidas?\s+e\s+responsabilidades/i,
+    /d[eé]bitos?\s+e\s+responsabilidades/i,
+    /vale\s+a\s+pena/i,
+    /parecer\s+final/i,
+    /conclus[aã]o/i,
+  ];
 
-  return (
-    html +
-    `
-<div style="margin-top:16px;border:1px solid #2a2a2a;border-radius:14px;padding:16px;background:#0f0f0f;color:#fff;">
-  🔒 Conteúdo bloqueado<br/>
-  Desbloqueie por <b style="color:#d4af37;">${price}</b>
-</div>`
-  );
+  let cutIndex = -1;
+
+  for (const p of patterns) {
+    const m = html.match(p);
+    if (m && typeof m.index === "number") {
+      if (cutIndex === -1 || m.index < cutIndex) cutIndex = m.index;
+    }
+  }
+
+  if (cutIndex === -1) return html;
+
+  const visible = html.slice(0, cutIndex);
+
+  const paywall = `
+  <div style="
+    margin-top:16px;
+    border:1px solid #2a2a2a;
+    border-radius:14px;
+    padding:16px;
+    background:#0f0f0f;
+    color:#fff;
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+  ">
+    <div style="font-weight:900; font-size:16px; margin-bottom:8px;">🔒 Conteúdo bloqueado</div>
+    <div style="color:#aaa; line-height:1.5;">
+      <!-- ✅ SOMENTE PREÇO ALTERADO -->
+      Desbloqueie por <b style="color:#d4af37;">${UNLOCK_PRICE_LABEL}</b> para ver:
+      <ul style="margin:10px 0 0 18px; line-height:1.8; color:#ddd;">
+        <li><b>Riscos jurídicos detalhados</b></li>
+        <li><b>Dívidas e responsabilidades</b></li>
+        <li><b>Parecer final</b> (vale a pena ou não)</li>
+      </ul>
+    </div>
+  </div>
+  `;
+
+  return visible + paywall;
 }
