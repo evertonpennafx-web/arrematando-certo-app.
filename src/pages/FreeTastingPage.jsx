@@ -11,9 +11,8 @@ export default function FreeTastingPage() {
   const [loading, setLoading] = useState(false);
   const [statusMsg, setStatusMsg] = useState("");
 
-  // ✅ Marcador pra você ter certeza que a versão certa subiu
   useEffect(() => {
-    console.log("✅ FreeTastingPage vAPI (chamando /api/create_preview) carregado");
+    console.log("✅ FreeTastingPage vAPI carregado");
   }, []);
 
   function digitsOnly(v) {
@@ -45,18 +44,15 @@ export default function FreeTastingPage() {
 
     if (!urlPdf.trim()) return setStatusMsg("Cole o link direto do PDF do edital.");
     if (!looksLikePdfUrl(urlPdf))
-      return setStatusMsg(
-        "Parece que esse link não é do PDF. Abra o edital no site do leilão, copie o link que abre o PDF (geralmente contém .pdf) e cole aqui.",
-      );
+      return setStatusMsg("Esse link não parece ser um PDF.");
 
-    // ✅ AJUSTE: Link do leilão agora é opcional (para reduzir fricção)
     if (!nome.trim()) return setStatusMsg("Informe seu nome.");
     if (!whatsapp.trim()) return setStatusMsg("Informe seu WhatsApp.");
     if (!email.trim()) return setStatusMsg("Informe seu email.");
 
     const whats = digitsOnly(whatsapp);
-    if (whats.length < 10) return setStatusMsg("WhatsApp inválido. Ex: (11) 99999-9999.");
-    if (!email.includes("@") || email.length < 6) return setStatusMsg("Email inválido.");
+    if (whats.length < 10) return setStatusMsg("WhatsApp inválido.");
+    if (!email.includes("@")) return setStatusMsg("Email inválido.");
 
     setLoading(true);
 
@@ -64,12 +60,9 @@ export default function FreeTastingPage() {
       setStatusMsg("Gerando prévia…");
 
       const pdf = urlPdf.trim();
-
-      // ✅ AJUSTE: fallback caso não preencha o link do leilão
       const leilao = editalLink.trim() || "não informado";
 
       const res = await callCreatePreview({
-        // compatível antigo + novo
         url_pdf: pdf,
         edital_link: leilao,
         pdf_url: pdf,
@@ -87,7 +80,7 @@ export default function FreeTastingPage() {
         (id && token ? `/relatorio?id=${encodeURIComponent(id)}&t=${encodeURIComponent(token)}` : null);
 
       if (!reportUrl) {
-        setStatusMsg("Prévia criada, mas não consegui abrir o relatório automaticamente.");
+        setStatusMsg("Prévia criada, mas não abriu automaticamente.");
         return;
       }
 
@@ -103,109 +96,76 @@ export default function FreeTastingPage() {
     <Layout>
       <div className="mx-auto max-w-3xl px-4 py-10">
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
-          <h1 className="text-2xl font-bold">Degustação Gratuita</h1>
 
-          <div className="mt-4 rounded-xl border border-[#d4af37]/30 bg-[#d4af37]/10 p-4">
-            <div className="text-lg font-extrabold text-[#d4af37]">TESTE AGORA COM QUALQUER EDITAL</div>
-            <div className="mt-1 text-white/80">
-              Não precisa ser o imóvel que você vai comprar. Pode usar qualquer edital só para testar o sistema.
-            </div>
+          {/* NOVO TITULO FORTE */}
+          <h1 className="text-3xl font-extrabold">
+            Descubra se esse imóvel pode virar prejuízo antes do lance
+          </h1>
+
+          {/* CAIXA PSICOLÓGICA */}
+          <div className="mt-4 text-white/70">
+            ✔ análise automática em minutos<br/>
+            ✔ não precisa entender jurídico<br/>
+            ✔ investidores usam antes de dar lance
           </div>
 
-          <p className="mt-2 text-white/70">
-            Cole o <b>link direto do PDF do edital</b> para gerar uma <b>prévia automática</b>.
-            <br />
-            ⚠️ <b>Não é upload de arquivo.</b> É só copiar o link do PDF que abre no navegador
-            (normalmente contém <code>.pdf</code>).
-          </p>
-
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+
             <div>
               <label className="block text-sm font-semibold text-white/80">
-                🔗 Link direto do PDF do edital{" "}
-                <span className="text-[#d4af37]">(obrigatório)</span>
+                🔗 Link direto do PDF do edital
               </label>
+
               <input
                 value={urlPdf}
                 onChange={(e) => setUrlPdf(e.target.value)}
-                placeholder="Ex: https://site-do-leilao.com.br/editais/edital123.pdf"
                 required
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
+
+              {/* NOVA FRASE PSICOLÓGICA */}
               <div className="mt-2 text-xs text-white/50">
-                Como pegar: no site do leilão, clique em <b>“Edital (PDF)”</b> ou{" "}
-                <b>“Baixar edital”</b>, abra o PDF e copie o link do navegador.
+                Você pode usar QUALQUER edital só pra testar. Nem precisa ser o imóvel real.
               </div>
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-white/80">
-                🌐 Link do leilão <span className="text-white/50">(opcional por enquanto)</span>
+                🌐 Link do leilão (opcional)
               </label>
               <input
                 value={editalLink}
                 onChange={(e) => setEditalLink(e.target.value)}
-                placeholder="Ex: https://... (página do leilão) — opcional"
-                className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
-              />
-              <div className="mt-2 text-xs text-white/50">
-                Se você já tiver, cole aqui. Se não tiver agora, pode seguir — eu peço depois no WhatsApp.
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-white/80">
-                Nome <span className="text-[#d4af37]">(obrigatório)</span>
-              </label>
-              <input
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                placeholder="Seu nome completo"
-                required
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-white/80">
-                WhatsApp <span className="text-[#d4af37]">(obrigatório)</span>
-              </label>
-              <input
-                value={whatsapp}
-                onChange={(e) => setWhatsapp(e.target.value)}
-                placeholder="(11) 99999-9999"
-                required
-                className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
-              />
+              <input value={nome} onChange={(e)=>setNome(e.target.value)} placeholder="Seu nome"
+              required className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white"/>
             </div>
 
             <div>
-              <label className="block text-sm font-semibold text-white/80">
-                Email <span className="text-[#d4af37]">(obrigatório)</span>
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="seu@email.com"
-                required
-                className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
-              />
+              <input value={whatsapp} onChange={(e)=>setWhatsapp(e.target.value)} placeholder="WhatsApp"
+              required className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white"/>
             </div>
 
+            <div>
+              <input type="email" value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="Email"
+              required className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white"/>
+            </div>
+
+            {/* BOTÃO MELHORADO */}
             <button
               type="submit"
               disabled={loading}
               className="w-full rounded-xl bg-[#d4af37] px-6 py-4 text-center font-extrabold text-black disabled:opacity-60"
             >
-              {loading ? "Gerando…" : "Gerar prévia gratuita do relatório"}
+              {loading ? "Gerando…" : "Analisar edital grátis agora (leva menos de 2 minutos)"}
             </button>
 
             {statusMsg ? <div className="text-sm text-white/70">{statusMsg}</div> : null}
 
-            <div className="text-xs text-white/50">
-              * Prévia automática. Não substitui análise jurídica.
-            </div>
           </form>
         </div>
       </div>
