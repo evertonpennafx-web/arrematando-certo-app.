@@ -2,7 +2,9 @@ import React, { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 
 export default function FreeTastingPage() {
-  const [urlPdf, setUrlPdf] = useState("");
+  // ✅ AJUSTE 1 (mínimo): já vem com um PDF exemplo preenchido
+  const [urlPdf, setUrlPdf] = useState("https://www.arrematandocerto.com.br/edital%206%20folhas.pdf");
+
   const [editalLink, setEditalLink] = useState("");
   const [nome, setNome] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
@@ -102,6 +104,14 @@ export default function FreeTastingPage() {
       <div className="mx-auto max-w-3xl px-4 py-10">
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
           <h1 className="text-2xl font-bold">Degustação Gratuita</h1>
+
+          {/* ✅ AJUSTE 2 (mínimo): box destravador */}
+          <div className="mt-4 rounded-xl border border-[#d4af37]/30 bg-[#d4af37]/10 p-4">
+            <div className="text-lg font-extrabold text-[#d4af37]">TESTE AGORA COM QUALQUER EDITAL</div>
+            <div className="mt-1 text-white/80">
+              Não precisa ser o imóvel que você vai comprar. Pode usar qualquer edital só para testar o sistema.
+            </div>
+          </div>
 
           <p className="mt-2 text-white/70">
             Cole o <b>link direto do PDF do edital</b> para gerar uma <b>prévia automática</b>.
