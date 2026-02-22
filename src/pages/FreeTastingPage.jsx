@@ -2,9 +2,7 @@ import React, { useEffect, useState } from "react";
 import Layout from "@/components/Layout";
 
 export default function FreeTastingPage() {
-  // ✅ AJUSTE 1 (mínimo): já vem com um PDF exemplo preenchido
   const [urlPdf, setUrlPdf] = useState("https://www.arrematandocerto.com.br/edital%206%20folhas.pdf");
-
   const [editalLink, setEditalLink] = useState("");
   const [nome, setNome] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
@@ -51,7 +49,7 @@ export default function FreeTastingPage() {
         "Parece que esse link não é do PDF. Abra o edital no site do leilão, copie o link que abre o PDF (geralmente contém .pdf) e cole aqui.",
       );
 
-    if (!editalLink.trim()) return setStatusMsg("Informe o link do leilão.");
+    // ✅ AJUSTE: Link do leilão agora é opcional (para reduzir fricção)
     if (!nome.trim()) return setStatusMsg("Informe seu nome.");
     if (!whatsapp.trim()) return setStatusMsg("Informe seu WhatsApp.");
     if (!email.trim()) return setStatusMsg("Informe seu email.");
@@ -66,7 +64,9 @@ export default function FreeTastingPage() {
       setStatusMsg("Gerando prévia…");
 
       const pdf = urlPdf.trim();
-      const leilao = editalLink.trim();
+
+      // ✅ AJUSTE: fallback caso não preencha o link do leilão
+      const leilao = editalLink.trim() || "não informado";
 
       const res = await callCreatePreview({
         // compatível antigo + novo
@@ -105,7 +105,6 @@ export default function FreeTastingPage() {
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
           <h1 className="text-2xl font-bold">Degustação Gratuita</h1>
 
-          {/* ✅ AJUSTE 2 (mínimo): box destravador */}
           <div className="mt-4 rounded-xl border border-[#d4af37]/30 bg-[#d4af37]/10 p-4">
             <div className="text-lg font-extrabold text-[#d4af37]">TESTE AGORA COM QUALQUER EDITAL</div>
             <div className="mt-1 text-white/80">
@@ -141,17 +140,16 @@ export default function FreeTastingPage() {
 
             <div>
               <label className="block text-sm font-semibold text-white/80">
-                🌐 Link do leilão <span className="text-[#d4af37]">(obrigatório)</span>
+                🌐 Link do leilão <span className="text-white/50">(opcional por enquanto)</span>
               </label>
               <input
                 value={editalLink}
                 onChange={(e) => setEditalLink(e.target.value)}
-                placeholder="Ex: https://... (página do leilão)"
-                required
+                placeholder="Ex: https://... (página do leilão) — opcional"
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
               <div className="mt-2 text-xs text-white/50">
-                Cole o link da página onde o imóvel/lote está anunciado.
+                Se você já tiver, cole aqui. Se não tiver agora, pode seguir — eu peço depois no WhatsApp.
               </div>
             </div>
 
