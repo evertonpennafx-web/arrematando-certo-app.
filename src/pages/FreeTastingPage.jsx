@@ -95,41 +95,36 @@ export default function FreeTastingPage() {
     <Layout>
       <div className="mx-auto max-w-3xl px-4 py-10">
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
-          {/* HEADLINE (copy mais forte, sem mexer no fluxo) */}
+          {/* TITULO (mais direto pra decisão) */}
           <h1 className="text-3xl font-extrabold">
-            Descubra em 2 minutos se um imóvel de leilão tem riscos e dívidas ocultas
-            <span className="block text-white/70 text-base font-semibold mt-2">
-              Antes de arriscar seu dinheiro no lance.
-            </span>
+            Antes de dar qualquer lance, veja se esse imóvel tem dívida, processo ou risco escondido
           </h1>
 
-          {/* BENEFÍCIOS */}
-          <div className="mt-4 text-white/70 leading-relaxed">
-            ✔ análise automática em minutos <br />
-            ✔ não precisa entender jurídico <br />
-            ✔ você recebe um relatório claro (risco, alertas e conclusão)
+          {/* SUBTITULO (clareza + velocidade) */}
+          <p className="mt-2 text-white/70">
+            A IA analisa o edital e te entrega um relatório claro com <b>alertas</b> e <b>conclusão</b> em poucos minutos.
+          </p>
+
+          {/* BENEFÍCIOS (mais fortes) */}
+          <div className="mt-4 text-white/70">
+            ✔ descobre dívidas ocultas e responsabilidades do arrematante
+            <br />
+            ✔ identifica risco jurídico, ocupação e pontos críticos do edital
+            <br />
+            ✔ mostra se vale a pena ou se pode virar prejuízo
           </div>
 
-          {/* ✅ BOTÃO DEMO (NOVA PEÇA PRINCIPAL — sem mexer no que já funciona) */}
-          <div className="mt-6">
-            <a href="/demo-relatorio.html" className="block">
-              <button
-                type="button"
-                className="w-full rounded-xl bg-white px-6 py-4 text-center font-extrabold text-black hover:opacity-90"
-              >
-                👀 VER UM RELATÓRIO AGORA (DEMO REAL)
-                <div className="text-xs font-semibold opacity-80 mt-1">
-                  (leva 10 segundos — sem preencher nada)
-                </div>
-              </button>
+          {/* CTA DEMO (remove fricção) */}
+          <div className="mt-5">
+            <a
+              href="/demo-relatorio.html"
+              className="block w-full rounded-xl bg-white px-6 py-4 text-center font-extrabold text-black"
+            >
+              👀 Ver um exemplo real do relatório (10 segundos)
             </a>
-
-            <div className="mt-3 text-xs text-white/50">
-              Dica: veja a demo primeiro e depois analise o seu edital.
-            </div>
+            <div className="mt-2 text-xs text-white/50">Dica: veja a demo primeiro e depois analise o seu.</div>
           </div>
 
-          {/* FORM (mantido — só desce um pouco) */}
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
             <div>
               <label className="block text-sm font-semibold text-white/80">🔗 Link direto do PDF do edital</label>
@@ -141,12 +136,13 @@ export default function FreeTastingPage() {
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
 
+              {/* TEXTO QUE AUMENTA ENVIO */}
               <div className="mt-2 text-xs text-white/50">
-                Você pode usar QUALQUER edital só pra testar. Nem precisa ser o imóvel real.
+                Já deixamos um <b>edital de exemplo</b> preenchido aí em cima. Se quiser, pode <b>clicar direto em gerar</b>.
               </div>
 
-              <div className="mt-2 text-xs text-white/50">
-                Como pegar: no site do leilão, clique em “Edital (PDF)”/“Baixar edital”, abra o PDF e copie o link do navegador.
+              <div className="mt-2 text-xs text-white/40">
+                Como pegar: no site do leilão, clique em <b>“Edital (PDF)”</b> / <b>“Baixar edital”</b>, abra o PDF e copie o link do navegador.
               </div>
             </div>
 
@@ -155,6 +151,7 @@ export default function FreeTastingPage() {
               <input
                 value={editalLink}
                 onChange={(e) => setEditalLink(e.target.value)}
+                placeholder="Se tiver, cole o link do lote (ajuda a análise, mas não é obrigatório)"
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
             </div>
@@ -190,19 +187,21 @@ export default function FreeTastingPage() {
               />
             </div>
 
+            {/* BOTÃO PRINCIPAL (mais decisão) */}
             <button
               type="submit"
               disabled={loading}
               className="w-full rounded-xl bg-[#d4af37] px-6 py-4 text-center font-extrabold text-black disabled:opacity-60"
             >
-              {loading ? "Gerando…" : "GERAR RELATÓRIO GRÁTIS AGORA (leva menos de 2 minutos)"}
+              {loading ? "Gerando…" : "Ver se meu imóvel tem risco antes do lance"}
             </button>
 
-            {statusMsg ? <div className="text-sm text-white/70">{statusMsg}</div> : null}
-
+            {/* MICRO-COPY (reduz objeção) */}
             <div className="text-xs text-white/50">
-              * Prévia automática. Não substitui análise jurídica.
+              🔒 Dados protegidos • ⚡ Resultado em poucos minutos • ✅ Não enviamos spam
             </div>
+
+            {statusMsg ? <div className="text-sm text-white/70">{statusMsg}</div> : null}
           </form>
         </div>
       </div>
