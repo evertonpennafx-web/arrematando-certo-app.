@@ -1,67 +1,160 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Relatório Demo</title>
-<style>
-body{
-background:#111;
-color:#fff;
-font-family:system-ui;
-padding:40px;
-max-width:900px;
-margin:auto;
-}
-.card{
-background:#1a1a1a;
-border:1px solid #333;
-padding:20px;
-border-radius:14px;
-margin-bottom:16px;
-}
-.ok{color:#3bd671;font-weight:700;}
-.warn{color:#ffcc00;font-weight:700;}
-.bad{color:#ff4d4d;font-weight:700;}
-button{
-background:#d4af37;
-border:0;
-padding:16px 24px;
-font-weight:900;
-border-radius:10px;
-cursor:pointer;
-}
-</style>
-</head>
+<!doctype html>
+<html lang="pt-br">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Demo — Relatório</title>
+    <style>
+      :root {
+        --bg: #0b0b0b;
+        --panel: #101010;
+        --card: #141414;
+        --border: #242424;
+        --text: #ffffff;
+        --muted: #a8a8a8;
+        --gold: #d4af37;
+        --ok: #33d17a;
+        --warn: #f6c343;
+        --bad: #ff4d4d;
+      }
 
-<body>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+        background: radial-gradient(1200px 600px at 50% -10%, #1a1a1a 0%, var(--bg) 55%);
+        color: var(--text);
+      }
 
-<h1>📊 Resultado da análise do edital</h1>
+      .wrap {
+        min-height: 100vh;
+        padding: 56px 16px;
+        display: flex;
+        justify-content: center;
+        align-items: flex-start;
+      }
 
-<div class="card">
-✅ Matrícula encontrada<br>
-<span class="ok">Sem bloqueio judicial</span>
-</div>
+      .container {
+        width: 100%;
+        max-width: 980px;
+      }
 
-<div class="card">
-⚠️ Dívida condominial identificada<br>
-<span class="warn">R$ 12.800</span>
-</div>
+      h1 {
+        margin: 0 0 26px 0;
+        font-size: 44px;
+        line-height: 1.06;
+        letter-spacing: -0.5px;
+      }
 
-<div class="card">
-🚨 Ocupação do imóvel detectada<br>
-<span class="bad">Pode exigir ação judicial</span>
-</div>
+      .card {
+        background: linear-gradient(180deg, rgba(255,255,255,0.06) 0%, rgba(255,255,255,0.03) 100%);
+        border: 1px solid var(--border);
+        border-radius: 18px;
+        padding: 22px 22px;
+        margin: 18px 0;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.35);
+      }
 
-<div class="card">
-<b>Conclusão automática:</b><br><br>
-⚠️ Risco médio — avaliar antes de dar lance
-</div>
+      .ok { color: var(--ok); font-weight: 800; }
+      .warn { color: var(--warn); font-weight: 900; }
+      .bad { color: var(--bad); font-weight: 900; }
 
-<br><br>
+      .subtle {
+        color: var(--muted);
+        line-height: 1.6;
+      }
 
-<a href="/degustacao-gratuita">
-<button>ANALISAR MEU EDITAL AGORA</button>
-</a>
+      .ctaBox {
+        margin-top: 18px;
+        padding: 16px 16px;
+        border-radius: 16px;
+        background: rgba(212,175,55,0.08);
+        border: 1px solid rgba(212,175,55,0.25);
+      }
 
-</body>
+      .ctaTitle {
+        font-weight: 1000;
+        color: var(--text);
+        margin-bottom: 6px;
+      }
+
+      .ctaText {
+        color: #d7d7d7;
+        line-height: 1.6;
+      }
+
+      .ctaText b { color: var(--gold); }
+
+      a { color: inherit; text-decoration: none; }
+
+      button {
+        margin-top: 18px;
+        background: var(--gold);
+        color: #111;
+        border: none;
+        border-radius: 14px;
+        padding: 16px 22px;
+        font-weight: 1000;
+        letter-spacing: 0.2px;
+        cursor: pointer;
+        box-shadow: 0 10px 30px rgba(212,175,55,0.25);
+        min-width: 320px;
+      }
+
+      button:hover { filter: brightness(1.03); }
+      .hint { margin-top: 10px; color: #8c8c8c; font-size: 13px; }
+      .spacer { height: 14px; }
+
+      @media (max-width: 640px) {
+        h1 { font-size: 34px; }
+        button { width: 100%; min-width: auto; }
+      }
+    </style>
+  </head>
+
+  <body>
+    <div class="wrap">
+      <div class="container">
+        <h1>📊 Resultado da análise do edital</h1>
+
+        <div class="card">
+          ✅ Matrícula encontrada<br />
+          <span class="ok">Sem bloqueio judicial</span>
+        </div>
+
+        <div class="card">
+          ⚠️ Dívida condominial identificada<br />
+          <span class="warn">R$ 12.800</span>
+        </div>
+
+        <div class="card">
+          🚨 Ocupação do imóvel detectada<br />
+          <span class="bad">Pode exigir ação judicial</span>
+        </div>
+
+        <div class="card">
+          <b>Conclusão automática:</b><br /><br />
+          ⚠️ Risco médio — avaliar antes de dar lance
+        </div>
+
+        <!-- ✅ NOVO BLOCO DE PERSUASÃO (sem mudar fluxo/estrutura) -->
+        <div class="ctaBox">
+          <div class="ctaTitle">⚠️ Este é um exemplo (DEMO).</div>
+          <div class="ctaText">
+            No seu leilão, os riscos podem ser <b>maiores</b>: dívidas ocultas, ocupação, ações judiciais e custos que ninguém te conta.<br />
+            <b>Analise seu edital antes de colocar dinheiro no lance.</b> Leva menos de 2 minutos.
+          </div>
+        </div>
+
+        <div class="spacer"></div>
+
+        <a href="/degustacao-gratuita">
+          <!-- ✅ BOTÃO COM TEXTO MAIS FORTE -->
+          <button>VERIFICAR RISCOS DO MEU EDITAL AGORA</button>
+        </a>
+
+        <div class="hint">Dica: cole o link do PDF do edital e receba uma prévia automática em minutos.</div>
+      </div>
+    </div>
+  </body>
 </html>
