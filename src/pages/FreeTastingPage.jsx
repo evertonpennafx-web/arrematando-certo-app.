@@ -95,34 +95,34 @@ export default function FreeTastingPage() {
     <Layout>
       <div className="mx-auto max-w-3xl px-4 py-10">
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 shadow-xl">
-          {/* TITULO (mais direto pra decisão) */}
           <h1 className="text-3xl font-extrabold">
-            Antes de dar qualquer lance, veja se esse imóvel tem dívida, processo ou risco escondido
+            Descubra em 2 minutos se um imóvel de leilão tem riscos e dívidas ocultas
           </h1>
 
-          {/* SUBTITULO (clareza + velocidade) */}
-          <p className="mt-2 text-white/70">
-            A IA analisa o edital e te entrega um relatório claro com <b>alertas</b> e <b>conclusão</b> em poucos minutos.
-          </p>
+          <p className="mt-2 text-white/70">Antes de arriscar seu dinheiro no lance.</p>
 
-          {/* BENEFÍCIOS (mais fortes) */}
           <div className="mt-4 text-white/70">
-            ✔ descobre dívidas ocultas e responsabilidades do arrematante
+            ✔ análise automática em minutos
             <br />
-            ✔ identifica risco jurídico, ocupação e pontos críticos do edital
+            ✔ não precisa entender jurídico
             <br />
-            ✔ mostra se vale a pena ou se pode virar prejuízo
+            ✔ você recebe um relatório claro (risco, alertas e conclusão)
           </div>
 
-          {/* CTA DEMO (remove fricção) */}
-          <div className="mt-5">
+          {/* CTA DEMO */}
+          <div className="mt-6">
             <a
               href="/demo-relatorio.html"
-              className="block w-full rounded-xl bg-white px-6 py-4 text-center font-extrabold text-black"
+              className="block w-full rounded-2xl border border-white/10 bg-white px-6 py-5 text-center font-extrabold text-black"
+              style={{ boxShadow: "0 10px 40px rgba(0,0,0,0.35)" }}
             >
-              👀 Ver um exemplo real do relatório (10 segundos)
+              👀 VER UM RELATÓRIO AGORA (DEMO REAL)
+              <div className="mt-1 text-sm font-semibold text-black/70">
+                (leva 10 segundos — sem preencher nada)
+              </div>
             </a>
-            <div className="mt-2 text-xs text-white/50">Dica: veja a demo primeiro e depois analise o seu.</div>
+
+            <div className="mt-3 text-xs text-white/40">Dica: veja a demo primeiro e depois analise o seu edital.</div>
           </div>
 
           <form onSubmit={handleSubmit} className="mt-6 space-y-4">
@@ -136,13 +136,12 @@ export default function FreeTastingPage() {
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
 
-              {/* TEXTO QUE AUMENTA ENVIO */}
               <div className="mt-2 text-xs text-white/50">
-                Já deixamos um <b>edital de exemplo</b> preenchido aí em cima. Se quiser, pode <b>clicar direto em gerar</b>.
+                Você pode usar QUALQUER edital só pra testar. Nem precisa ser o imóvel real.
               </div>
 
               <div className="mt-2 text-xs text-white/40">
-                Como pegar: no site do leilão, clique em <b>“Edital (PDF)”</b> / <b>“Baixar edital”</b>, abra o PDF e copie o link do navegador.
+                Como pegar: no site do leilão, clique em “Edital (PDF)”/“Baixar edital”, abra o PDF e copie o link do navegador.
               </div>
             </div>
 
@@ -151,7 +150,7 @@ export default function FreeTastingPage() {
               <input
                 value={editalLink}
                 onChange={(e) => setEditalLink(e.target.value)}
-                placeholder="Se tiver, cole o link do lote (ajuda a análise, mas não é obrigatório)"
+                placeholder="Ex: https://... (página do leilão)"
                 className="mt-2 w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
             </div>
@@ -162,7 +161,7 @@ export default function FreeTastingPage() {
                 onChange={(e) => setNome(e.target.value)}
                 placeholder="Seu nome"
                 required
-                className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white"
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
             </div>
 
@@ -172,7 +171,7 @@ export default function FreeTastingPage() {
                 onChange={(e) => setWhatsapp(e.target.value)}
                 placeholder="WhatsApp"
                 required
-                className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white"
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
             </div>
 
@@ -183,25 +182,26 @@ export default function FreeTastingPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email"
                 required
-                className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white"
+                className="w-full rounded-xl border border-white/10 bg-black/30 px-4 py-3 text-white outline-none"
               />
             </div>
 
-            {/* BOTÃO PRINCIPAL (mais decisão) */}
             <button
               type="submit"
               disabled={loading}
               className="w-full rounded-xl bg-[#d4af37] px-6 py-4 text-center font-extrabold text-black disabled:opacity-60"
             >
-              {loading ? "Gerando…" : "Ver se meu imóvel tem risco antes do lance"}
+              {loading ? "Gerando…" : "GERAR RELATÓRIO GRÁTIS AGORA (leva menos de 2 minutos)"}
             </button>
 
-            {/* MICRO-COPY (reduz objeção) */}
+            {statusMsg ? <div className="text-sm text-white/70">{statusMsg}</div> : null}
+
+            {/* ✅ ÚLTIMO AJUSTE: frase de risco (abaixo do botão) */}
             <div className="text-xs text-white/50">
-              🔒 Dados protegidos • ⚡ Resultado em poucos minutos • ✅ Não enviamos spam
+              ⚠️ Leilão não perdoa erro: um item oculto no edital pode virar prejuízo de milhares.
             </div>
 
-            {statusMsg ? <div className="text-sm text-white/70">{statusMsg}</div> : null}
+            <div className="text-xs text-white/40">* Prévia automática. Não substitui análise jurídica.</div>
           </form>
         </div>
       </div>
