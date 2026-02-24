@@ -1,11 +1,22 @@
-import { BrowserRouter } from "react-router-dom";
+import { BrowserRouter, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import AppRoutes from "./routes";
 
-export default function App() {
+function PixelRouteTracker() {
+  const location = useLocation();
 
   useEffect(() => {
-    // META PIXEL
+    try {
+      if (window.fbq) window.fbq("track", "PageView");
+    } catch (e) {}
+  }, [location.pathname, location.search]);
+
+  return null;
+}
+
+export default function App() {
+  useEffect(() => {
+    // Instala o Pixel só uma vez
     const script = document.createElement("script");
     script.innerHTML = `
       !function(f,b,e,v,n,t,s)
@@ -24,6 +35,7 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      <PixelRouteTracker />
       <AppRoutes />
     </BrowserRouter>
   );
