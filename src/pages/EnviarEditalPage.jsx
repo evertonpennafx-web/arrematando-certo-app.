@@ -10,14 +10,27 @@ const EnviarEditalPage = () => {
   const navigate = useNavigate();
 
   const handlePlanSelect = (planId) => {
+    // Evento base: selecionou um plano (ajuda a entender intenção)
+    if (window.fbq) window.fbq('trackCustom', 'SelectPlan', { planId });
+
     if (planId === 'free_tasting') {
+      // Pixel event: lead leve (degustação)
+      if (window.fbq) window.fbq('track', 'Lead');
+
       navigate('/degustacao-gratuita');
       return;
     }
     if (planId === 'premium') {
+      // Pixel event: intenção de consultoria
+      if (window.fbq) window.fbq('track', 'Contact');
+
       navigate('/consultoria');
       return;
     }
+
+    // Pixel event: começou fluxo de compra (indo para submission)
+    if (window.fbq) window.fbq('track', 'InitiateCheckout', { planId });
+
     navigate(`/submission?plan=${planId}`);
   };
 
