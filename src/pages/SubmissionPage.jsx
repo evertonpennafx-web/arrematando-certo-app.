@@ -22,7 +22,6 @@ export default function SubmissionPage() {
     return (params.get("plan") || "standard").toLowerCase();
   }, [location.search]);
 
-  // ✅ toggle mensal/anual quando for express
   const [expressBilling, setExpressBilling] = useState(
     planFromUrl === "express_annual" ? "annual" : "monthly"
   );
@@ -86,8 +85,8 @@ export default function SubmissionPage() {
           "Entrega em até 48h",
         ],
         checkoutUrl: KIWIFY.standard,
-        requiresAuctionLink: true, // ✅ obrigatório para revisao profissional
-        requiresEmail: true, // ✅ email obrigatório para contato
+        requiresAuctionLink: true,
+        requiresEmail: true,
       },
     };
 
@@ -96,7 +95,6 @@ export default function SubmissionPage() {
 
   const isExpressFamily = planFromUrl === "express" || planFromUrl === "express_annual";
 
-  // form
   const [nome, setNome] = useState("");
   const [whatsapp, setWhatsapp] = useState("");
   const [email, setEmail] = useState("");
@@ -114,13 +112,11 @@ export default function SubmissionPage() {
     const whatsappOk = normalizeWhatsapp(whatsapp).length >= 10;
 
     if (!nomeOk || !whatsappOk) return;
-
     if (planInfo.requiresEmail && (email || "").trim().length < 5) return;
     if (planInfo.requiresAuctionLink && (linkLeilao || "").trim().length < 8) return;
 
     setLoading(true);
 
-    // ✅ salva lead antes de redirecionar
     const payload = {
       source: "submission",
       plan: effectivePlan,
@@ -132,10 +128,17 @@ export default function SubmissionPage() {
 
     const res = await saveLead(payload);
 
-    // ❌ Nunca mostrar erro pro cliente
-    if (!res?.ok) console.warn("Falha ao salvar lead no Supabase (seguindo checkout):", res);
+    // ✅ PIXEL EVENTS (ADICIONADO)
+    try {
+      if (window.fbq) {
+        window.fbq("track", "Lead");
+        window.fbq("track", "InitiateCheckout", { plan: effectivePlan });
+        window.fbq("trackCustom", "SubmitLead", { plan: effectivePlan });
+      }
+    } catch (e) {}
 
-    // ✅ micro delay ajuda alguns browsers a concluir a request antes do redirect
+    if (!res?.ok) console.warn("Falha ao salvar lead no Supabase:", res);
+
     await new Promise((r) => setTimeout(r, 250));
 
     window.location.assign(planInfo.checkoutUrl);
@@ -160,194 +163,43 @@ export default function SubmissionPage() {
         </div>
 
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+
           <motion.div {...fadeInUp} className="mb-6">
-            <Link
-              to="/"
-              className="inline-flex items-center gap-2 text-gray-300 hover:text-white transition"
-            >
+            <Link to="/" className="inline-flex items-center gap-2 text-gray-300 hover:text-white transition">
               ← Voltar
             </Link>
           </motion.div>
 
-          <motion.div {...fadeInUp} className="mb-6">
-            <div className="flex flex-wrap items-center gap-3">
-              {planInfo.badge && (
-                <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold bg-[#d4af37] text-black">
-                  <Star className="w-3 h-3 fill-current" />
-                  {planInfo.badge}
-                </span>
-              )}
-              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-black/40 border border-gray-700 text-gray-200 text-sm">
-                <Shield className="w-4 h-4 text-[#d4af37]" />
-                {planInfo.chipLeft}
-              </span>
-              <span className="inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-black/40 border border-gray-700 text-gray-200 text-sm">
-                {planInfo.chipRight}
-              </span>
-            </div>
-          </motion.div>
-
-          <motion.div {...fadeInUp} className="mb-10">
-            <h1 className="text-4xl md:text-6xl font-bold leading-tight">
-              <span className="text-white">{planInfo.title.split(" ").slice(0, 1).join(" ")}</span>{" "}
-              <span className="bg-gradient-to-r from-[#d4af37] to-[#f0d87f] bg-clip-text text-transparent">
-                {planInfo.title.split(" ").slice(1).join(" ")}
-              </span>
-            </h1>
-            <p className="text-lg md:text-xl text-gray-300 mt-3 max-w-3xl">{planInfo.subtitle}</p>
-          </motion.div>
-
-          {/* ✅ Toggle igual da home (apenas express) */}
-          {isExpressFamily && (
-            <motion.div {...fadeInUp} className="mb-10">
-              <div className="inline-flex bg-gray-900/50 border border-gray-800 rounded-lg p-1">
-                <button
-                  type="button"
-                  onClick={() => setExpressBilling("monthly")}
-                  className={`px-4 py-2 text-sm font-bold rounded-md transition ${
-                    expressBilling === "monthly"
-                      ? "bg-[#d4af37] text-black"
-                      : "text-gray-300 hover:text-white"
-                  }`}
-                >
-                  Mensal
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setExpressBilling("annual")}
-                  className={`px-4 py-2 text-sm font-bold rounded-md transition ${
-                    expressBilling === "annual"
-                      ? "bg-[#d4af37] text-black"
-                      : "text-gray-300 hover:text-white"
-                  }`}
-                >
-                  Anual
-                </button>
-              </div>
-            </motion.div>
-          )}
-
           <div className="grid lg:grid-cols-2 gap-8 items-start">
-            {/* Left */}
+
             <motion.div {...fadeInUp} className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#d4af37]/15 to-transparent rounded-2xl blur-xl" />
-              <div className="relative bg-gray-900/40 backdrop-blur-md border border-gray-800 rounded-2xl p-8">
-                <h2 className="text-2xl font-bold mb-6">O que você recebe</h2>
+              <form onSubmit={handleSubmit}
+                className="relative bg-gray-900/40 backdrop-blur-md border border-gray-800 rounded-2xl p-8">
 
-                <ul className="space-y-4">
-                  {planInfo.features.map((f) => (
-                    <li key={f} className="flex items-start gap-3 text-gray-200">
-                      <CheckCircle className="w-5 h-5 text-[#d4af37] mt-0.5 flex-shrink-0" />
-                      <span>{f}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <p className="text-xs text-gray-400 mt-6 italic">
-                  * A decisão de participação no leilão é de responsabilidade do comprador.
-                </p>
-              </div>
-            </motion.div>
-
-            {/* Right */}
-            <motion.div {...fadeInUp} className="relative">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#d4af37]/10 to-transparent rounded-2xl blur-xl" />
-
-              <form
-                onSubmit={handleSubmit}
-                className="relative bg-gray-900/40 backdrop-blur-md border border-gray-800 rounded-2xl p-8"
-              >
                 <h2 className="text-2xl font-bold mb-2">Preencha para continuar</h2>
-                <p className="text-gray-300 mb-6">
-                  Você será direcionado ao checkout para concluir o pagamento.
-                </p>
 
                 <div className="space-y-4">
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-[#d4af37] mb-2">
-                      <Phone className="w-4 h-4" />
-                      Nome completo <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                      value={nome}
-                      onChange={(e) => setNome(e.target.value)}
-                      placeholder="Seu nome"
-                      className="w-full bg-black/40 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d4af37]/70"
-                      autoComplete="name"
-                      required
-                    />
-                  </div>
 
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-[#d4af37] mb-2">
-                      <Phone className="w-4 h-4" />
-                      WhatsApp <span className="text-red-400">*</span>
-                    </label>
-                    <input
-                      value={whatsapp}
-                      onChange={(e) => setWhatsapp(e.target.value)}
-                      placeholder="(DDD) 00000-0000"
-                      className="w-full bg-black/40 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d4af37]/70"
-                      autoComplete="tel"
-                      required
-                    />
-                  </div>
+                  <input value={nome} onChange={(e)=>setNome(e.target.value)} placeholder="Nome" required />
+                  <input value={whatsapp} onChange={(e)=>setWhatsapp(e.target.value)} placeholder="WhatsApp" required />
 
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-[#d4af37] mb-2">
-                      <Mail className="w-4 h-4" />
-                      E-mail{" "}
-                      {planInfo.requiresEmail ? (
-                        <span className="text-red-400">*</span>
-                      ) : (
-                        <span className="text-gray-400">(opcional)</span>
-                      )}
-                    </label>
-                    <input
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="seu@email.com"
-                      className="w-full bg-black/40 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d4af37]/70"
-                      autoComplete="email"
-                      required={planInfo.requiresEmail}
-                    />
-                  </div>
+                  {planInfo.requiresEmail &&
+                    <input value={email} onChange={(e)=>setEmail(e.target.value)} placeholder="Email" required />
+                  }
 
-                  {planInfo.requiresAuctionLink && (
-                    <div>
-                      <label className="flex items-center gap-2 text-sm font-semibold text-[#d4af37] mb-2">
-                        <LinkIcon className="w-4 h-4" />
-                        Link do leilão <span className="text-red-400">*</span>
-                      </label>
-                      <input
-                        value={linkLeilao}
-                        onChange={(e) => setLinkLeilao(e.target.value)}
-                        placeholder="https://..."
-                        className="w-full bg-black/40 border border-gray-700 rounded-xl px-4 py-3 text-white outline-none focus:border-[#d4af37]/70"
-                        required
-                      />
-                    </div>
-                  )}
+                  {planInfo.requiresAuctionLink &&
+                    <input value={linkLeilao} onChange={(e)=>setLinkLeilao(e.target.value)} placeholder="Link do leilão" required />
+                  }
 
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className={`w-full mt-2 inline-flex items-center justify-center gap-2 px-6 py-4 rounded-xl font-extrabold text-black transition-all ${
-                      loading
-                        ? "bg-[#d4af37]/70 cursor-not-allowed"
-                        : "bg-gradient-to-r from-[#d4af37] to-[#b8941f] hover:shadow-lg hover:shadow-[#d4af37]/30"
-                    }`}
-                  >
+                  <button type="submit" disabled={loading}>
                     {loading ? "Redirecionando..." : "Ir para pagamento"}
                     <ArrowRight className="w-5 h-5" />
                   </button>
 
-                  <p className="text-xs text-gray-400">
-                    Ao continuar, você será direcionado para a página segura de pagamento (Kiwify).
-                  </p>
                 </div>
               </form>
             </motion.div>
+
           </div>
         </div>
       </section>
