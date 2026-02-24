@@ -35,14 +35,20 @@ const HomePage = () => {
   const handlePlanSelect = (planId) => {
     // Handling Free Tasting Button Click
     if (planId === 'free_tasting') {
+      // Pixel event: usuário pediu preview gratuito (lead leve / topo de funil)
+      if (window.fbq) window.fbq('track', 'Lead');
+
       navigate('/degustacao-gratuita');
       return;
     }
     
     // Handling Consultation Button Click
     if (planId === 'premium') { 
-       navigate('/consultoria');
-       return;
+      // Pixel event: intenção de consultoria
+      if (window.fbq) window.fbq('track', 'Contact');
+
+      navigate('/consultoria');
+      return;
     }
 
     // Redirect to submission form with selected plan
@@ -117,6 +123,10 @@ const HomePage = () => {
           >
             <Link
               to="/enviar-edital"
+              onClick={() => {
+                // Pixel event: clique no CTA principal (início de intenção)
+                if (window.fbq) window.fbq('track', 'StartAnalysis');
+              }}
               className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-[#d4af37] to-[#b8941f] text-black text-lg font-bold rounded-lg hover:shadow-2xl hover:shadow-[#d4af37]/50 transition-all duration-300 hover:scale-105"
             >
               ANALISAR IMÓVEL AGORA
@@ -785,6 +795,10 @@ const HomePage = () => {
             </p>
             <Link
               to="/enviar-edital"
+              onClick={() => {
+                // Pixel event: clique no CTA final (reforço de intenção)
+                if (window.fbq) window.fbq('track', 'StartAnalysis');
+              }}
               className="inline-flex items-center px-8 py-4 bg-gradient-to-r from-[#d4af37] to-[#b8941f] text-black text-lg font-bold rounded-lg hover:shadow-2xl hover:shadow-[#d4af37]/50 transition-all duration-300 hover:scale-105"
             >
               Enviar Edital Agora
